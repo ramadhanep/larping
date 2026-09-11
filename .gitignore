@@ -2,6 +2,3 @@ xcuserdata/
 DerivedData/
 *.xcuserstate
 .DS_Store
-
-# old backend + monorepo docs, kept locally for reference only
-archive/

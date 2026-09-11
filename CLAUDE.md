@@ -45,10 +45,6 @@ This is the root of the git repo — `larping.xcodeproj` is at top level, next
 to its source (`larping/`), tests (`larpingTests/`, `larpingUITests/`), and
 `docs/`.
 
-`archive/` holds a prior, now-removed NestJS backend and its docs, kept for
-historical reference only. It is not part of the current app (which has zero
-networking) and shouldn't be read for context on how the app works today.
-
 ## Verification
 
 ```bash
