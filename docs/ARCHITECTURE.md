@@ -31,8 +31,6 @@ monochrome accent as background): their label is forced to `.foregroundStyle
 button in dark mode). Destructive buttons (Finish) must NOT get that override
 — iOS renders them red-background/white-text natively.
 
-Per-sport color sets (`Sport*`) are dead assets (unused).
-
 ## Conventions
 
 - `SWIFT_VERSION = 5.0` with `SWIFT_APPROACHABLE_CONCURRENCY = YES` and

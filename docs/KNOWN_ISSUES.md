@@ -76,11 +76,6 @@ The exported share image uses a space-black background with full-white text
 regardless of the app's light/dark theme — intentional (Grok-style export).
 Not a bug.
 
-## No per-sport colors
-
-`SportRunning`/`SportCycling`/etc. color sets exist in the asset catalog but
-nothing uses them — the app is monochrome by design. Dead assets; deletable.
-
 ## Bundling fonts via the synchronized group silently fails
 
 Xcode's `PBXFileSystemSynchronizedRootGroup` does **not** copy `.ttf` files
