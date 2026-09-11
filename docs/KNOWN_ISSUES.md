@@ -74,7 +74,9 @@ see the double again.
 
 The exported share image uses a space-black background with full-white text
 regardless of the app's light/dark theme — intentional (Grok-style export).
-Not a bug.
+The route line is the one exception: it uses the adaptive `Accent` color, so
+it's lime or `#463CFF` depending on system appearance even though the
+background never changes. Not a bug.
 
 ## Bundling fonts via the synchronized group silently fails
 

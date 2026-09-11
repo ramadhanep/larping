@@ -1,16 +1,18 @@
 import CoreLocation
 import UIKit
 
-/// Builds the shareable activity card: the recorded route as a plain white
+/// Builds the shareable activity card: the recorded route as an accent-color
 /// line over either a custom photo (full-bleed, dimmed) or a deep space-black
 /// background, with the sport icon on the left of a "LARPING <SPORT>" header
-/// and stats centered in full white. System font throughout. Pure black &
-/// white — no brand color, no card, no logo, no map basemap.
+/// and stats centered in full white. System font throughout. Background is
+/// always space-dark regardless of the app's light/dark theme; only the route
+/// line adopts the current adaptive brand accent (lime dark / #463CFF light).
 enum ShareImageComposer {
     static let canvasSize = CGSize(width: 1080, height: 1920) // Instagram Story ratio
 
     static let white = UIColor.white
     static let spaceBlack = UIColor(red: 0.055, green: 0.067, blue: 0.082, alpha: 1) // Grok-style near-black
+    static var routeColor: UIColor { UIColor(named: "Accent") ?? white }
 
     struct Stats {
         let symbolName: String
@@ -21,7 +23,12 @@ enum ShareImageComposer {
         let date: String
     }
 
-    static func compose(photo: UIImage?, coordinates: [CLLocationCoordinate2D], stats: Stats) -> UIImage {
+    static func compose(
+        photo: UIImage?,
+        coordinates: [CLLocationCoordinate2D],
+        stats: Stats,
+        routeRevealFraction: Double = 1
+    ) -> UIImage {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         let renderer = UIGraphicsImageRenderer(size: canvasSize, format: format)
@@ -43,7 +50,7 @@ enum ShareImageComposer {
 
             drawHeader(stats, canvasWidth: width)
 
-            drawRoute(coordinates, canvasWidth: width)
+            drawRoute(coordinates, canvasWidth: width, revealFraction: routeRevealFraction)
 
             drawStats(stats, canvasWidth: width)
             drawFooter(canvasWidth: width)
@@ -87,12 +94,13 @@ enum ShareImageComposer {
         drawCentered(date, atY: 410 + title.size().height + 12, canvasWidth: canvasWidth)
     }
 
-    /// Draws the recorded route as a plain stroked white line, scaled to fit a
+    /// Draws the recorded route as a stroked accent-color line, scaled to fit a
     /// region whose aspect exactly matches the route's own bounding box, so the
     /// path is always centered with symmetric margins on all four sides — never
     /// shifted toward one edge — no matter how big or small the route is.
-    /// No endpoint markers.
-    private static func drawRoute(_ coordinates: [CLLocationCoordinate2D], canvasWidth: CGFloat) {
+    /// `revealFraction` (0...1) draws only the leading portion of the route in
+    /// recorded point order, for the animated video export. No endpoint markers.
+    private static func drawRoute(_ coordinates: [CLLocationCoordinate2D], canvasWidth: CGFloat, revealFraction: Double = 1) {
         guard coordinates.count > 1 else { return }
 
         let lats = coordinates.map(\.latitude)
@@ -127,14 +135,29 @@ enum ShareImageComposer {
             )
         }
 
+        let revealCount = max(2, Int(Double(points.count) * revealFraction))
+        let visiblePoints = Array(points.prefix(revealCount))
+
         let path = UIBezierPath()
-        path.move(to: points[0])
-        points.dropFirst().forEach { path.addLine(to: $0) }
+        path.move(to: visiblePoints[0])
+        visiblePoints.dropFirst().forEach { path.addLine(to: $0) }
         path.lineWidth = 16
         path.lineJoinStyle = .round
         path.lineCapStyle = .round
-        white.withAlphaComponent(0.95).setStroke()
+        routeColor.withAlphaComponent(0.95).setStroke()
         path.stroke()
+
+        // Leading dot marks the current tip while the route is still being
+        // revealed (video export); the finished static image has none.
+        if revealFraction < 1, let tip = visiblePoints.last {
+            let dotRect = CGRect(x: tip.x - 14, y: tip.y - 14, width: 28, height: 28)
+            routeColor.setFill()
+            UIBezierPath(ovalIn: dotRect).fill()
+            let outline = UIBezierPath(ovalIn: dotRect)
+            outline.lineWidth = 3
+            white.setStroke()
+            outline.stroke()
+        }
     }
 
     /// Stats rendered as one centered column — three rows of label + value.
@@ -162,20 +185,24 @@ enum ShareImageComposer {
         }
     }
 
-    /// "Larping · actually works" watermark with the repo URL right below it,
-    /// positioned high enough to clear Instagram Story's reply input area.
+    /// `LogoHorizontal` wordmark (replaces the old plain-text watermark) with
+    /// the repo URL right below it, positioned high enough to clear Instagram
+    /// Story's reply input area.
     private static func drawFooter(canvasWidth: CGFloat) {
-        let watermark = NSAttributedString(string: "Larping  ·  actually works", attributes: [
-            .font: UIFont.systemFont(ofSize: 34, weight: .bold),
-            .foregroundColor: white.withAlphaComponent(0.72),
-        ])
-        drawCentered(watermark, atY: 1580, canvasWidth: canvasWidth)
+        var logoBottom: CGFloat = 1580
+        if let logo = UIImage(named: "LogoHorizontal") {
+            let tinted = logo.withTintColor(white.withAlphaComponent(0.85), renderingMode: .alwaysTemplate)
+            let height: CGFloat = 44
+            let size = CGSize(width: tinted.size.width * (height / tinted.size.height), height: height)
+            tinted.draw(in: CGRect(x: (canvasWidth - size.width) / 2, y: 1560, width: size.width, height: size.height))
+            logoBottom = 1560 + size.height
+        }
 
         let repo = NSAttributedString(string: "github.com/ramadhanep/larping", attributes: [
             .font: UIFont.systemFont(ofSize: 30, weight: .semibold),
             .foregroundColor: white.withAlphaComponent(0.72),
         ])
-        drawCentered(repo, atY: 1638, canvasWidth: canvasWidth)
+        drawCentered(repo, atY: logoBottom + 20, canvasWidth: canvasWidth)
     }
 
     private static func drawCentered(_ string: NSAttributedString, atY y: CGFloat, canvasWidth: CGFloat) {

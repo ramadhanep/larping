@@ -130,24 +130,32 @@ point-to-point). A small accent-colored dot marker rides at the current tip
 become a sport-specific icon later. Paused after the draw completes so the
 timeline stops ticking.
 
-## Share card (`ShareImageComposer.compose(photo:coordinates:stats:)`)
+## Share card (`ShareImageComposer.compose(photo:coordinates:stats:routeRevealFraction:)`)
 
-Canvas 1080x1920, pure white-on-black, system font, no card/logo/brand color:
+Canvas 1080x1920, white text on a space-dark background regardless of the
+app's own light/dark theme; only the route line uses the adaptive brand
+accent:
 
 1. Background: photo full-bleed dimmed 48% black, or `spaceBlack` (#0E1115).
 2. Big centered sport icon (box ~230pt, aspect-preserved) at top.
 3. Centered "LARPING <SPORT>" (54 heavy) + date (40 semibold, 78% white).
-4. Route: white polyline (16pt, round joins), early-16th scale — fits into a
-   region whose aspect matches the route bbox, centered in the available area
-   (y≈560..970) → **symmetric margins** for any route size. No endpoint dots.
+4. Route: accent-color polyline (16pt, round joins) — `Accent` asset color
+   resolved at draw time, so it follows system light/dark mode (lime dark,
+   `#463CFF` light) even though the card background never changes. Fits into
+   a region whose aspect matches the route bbox, centered in the available
+   area (y≈560..970) → **symmetric margins** for any route size.
+   `routeRevealFraction` (0...1, default 1) draws only the leading portion in
+   recorded point order with a dot marker at the tip — used by the video
+   export template; the static image always passes 1 (no dot).
 5. Stats: one centered column, 3 rows (DISTANCE / DURATION / PACE), system
    font: labels 34 medium 62% white, values 64 heavy monospaced.
    Pace value has the ` /km` suffix stripped (pace is always per-km); speed
    sports keep `km/h`. The strip happens in `ShareActivityView.stats`, not the
    composer.
-6. Footer centered at y≈1580 ("Larping · actually works", 34 bold) and
-   y≈1638 (`github.com/ramadhanep/larping`, 30 semibold) — deliberately above
-   Instagram Story's reply-input area.
+6. Footer: `LogoHorizontal` wordmark centered at y≈1560 (44pt tall, white
+   85%) with the repo URL right below it — deliberately above Instagram
+   Story's reply-input area. Replaced the old plain-text "Larping · actually
+   works" watermark.
 
 `ShareActivityView`: renders the plain card immediately on open; Camera |
 Gallery buttons, then a plain-text "Plain background ×" link (shown only when
