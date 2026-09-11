@@ -39,6 +39,7 @@ shipping separate black/white files). Both are derived from `logo.png` /
 `logo-horizontal.png` at the repo root, which are raw, oversized design
 sources — never reference them directly from app code; regenerate the
 in-bundle assets from them instead if the source logo changes.
+`LogoHorizontal` is shown top-left of the Activities list toolbar.
 
 ## Conventions
 

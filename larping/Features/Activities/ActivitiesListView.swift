@@ -10,6 +10,14 @@ struct ActivitiesListView: View {
             content
                 .navigationTitle("Activities")
                 .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Image("LogoHorizontal")
+                            .renderingMode(.template)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 20)
+                            .foregroundStyle(.primary)
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
                             showImport = true
