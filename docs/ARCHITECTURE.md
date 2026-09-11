@@ -80,7 +80,7 @@ Features/
   Activities/    ActivitiesListView (@Query), ActivityDetailView,
                   ImportGPXView, ShareActivityView, ActivitiesStore
   Stats/         StatsView — Swift Charts last-7-days + per-sport
-  Profile/       ProfileView — name/bio, appearance, backup export/import
+  Profile/       ProfileView — banner + name/bio, appearance, backup export/import
 ```
 
 ## Data model

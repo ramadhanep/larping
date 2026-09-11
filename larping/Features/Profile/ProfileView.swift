@@ -7,7 +7,7 @@ struct ProfileView: View {
     @Environment(ActivitiesStore.self) private var activitiesStore
     @AppStorage("appearanceMode") private var appearanceMode = AppearanceMode.system
     @AppStorage("displayName") private var displayName = "Larping User"
-    @AppStorage("bio") private var bio = ""
+    @AppStorage("bio") private var bio = "Chasing routes, one recording at a time."
     @State private var showEdit = false
     @State private var exportDocument: BackupFile?
     @State private var showExporter = false
@@ -19,6 +19,24 @@ struct ProfileView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    ZStack {
+                        Color.accentColor
+                        Image("LogoHorizontal")
+                            .renderingMode(.template)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 32)
+                            .foregroundStyle(.white)
+                    }
+                    .frame(height: 140)
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .listRowInsets(EdgeInsets())
+                    .padding(.horizontal)
+                    .listRowBackground(Color.clear)
+                }
+
                 Section {
                     VStack(spacing: 8) {
                         Image(systemName: "figure.run.circle.fill")
