@@ -121,11 +121,13 @@ grid-binned intensity pass if the 50-activity cap or blending starts looking
 wrong at higher activity counts.
 
 **Route draw-in animation**: `ActivityDetailView.RouteMap` reveals the route
-polyline progressively over ~1.4s using `TimelineView(.animation(paused:))`
+polyline progressively over ~5.5s using `TimelineView(.animation(paused:))`
 — it slices `coordinates.prefix(revealedCount)` by elapsed-time fraction, so
 it follows recorded point order (works for loops/backtracks, not just
-point-to-point). Paused after the draw completes so the timeline stops
-ticking.
+point-to-point). A small accent-colored dot marker rides at the current tip
+(`coordinates[revealedCount - 1]`), standing in for "the person"; could
+become a sport-specific icon later. Paused after the draw completes so the
+timeline stops ticking.
 
 ## Share card (`ShareImageComposer.compose(photo:coordinates:stats:)`)
 

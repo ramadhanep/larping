@@ -97,7 +97,7 @@ struct ActivityDetailView: View {
 private struct RouteMap: View {
     let coordinates: [CLLocationCoordinate2D]
 
-    private static let drawDuration: TimeInterval = 1.4
+    private static let drawDuration: TimeInterval = 5.5
 
     @State private var startDate = Date()
     @State private var isDrawComplete = false
@@ -123,6 +123,15 @@ private struct RouteMap: View {
             Map(initialPosition: .region(region)) {
                 MapPolyline(coordinates: Array(coordinates.prefix(revealedCount)))
                     .stroke(.accent, lineWidth: 4)
+
+                // Leading marker at the animation's current tip — stands in for
+                // "the person"; could become a sport-specific icon later.
+                Annotation("", coordinate: coordinates[revealedCount - 1]) {
+                    Circle()
+                        .fill(.accent)
+                        .frame(width: 14, height: 14)
+                        .overlay(Circle().stroke(.white, lineWidth: 2))
+                }
             }
             .mapStyle(.standard)
             .allowsHitTesting(false)
