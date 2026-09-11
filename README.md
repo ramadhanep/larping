@@ -22,11 +22,11 @@ source.
   (top-trailing); the map is full-bleed.
 - **Activities** — list auto-refreshes via `@Query`; detail shows route map +
   bold stat tiles + delete (plain right-aligned link).
-- **Share** — 1080x1920 (Instagram Story ratio) card: route path line + big
-  centered sport icon + "LARPING <SPORT>" header + centered white stats (mini 3
-  rows), over a photo (camera/library, full-bleed dimmed) or space-black bg.
-  Pace is shown without the ` /km` unit; speed sports keep `km/h`. Shared via
-  the system share sheet.
+- **Share** — three swipeable 1080x1920 (Instagram Story ratio) templates:
+  a classic card (route path line + sport icon + stats, over a photo or
+  space-black bg), a map card (real map imagery with the route overlaid), and
+  a slow 60fps animated video of the route drawing in. Pace is shown without
+  the ` /km` unit; speed sports keep `km/h`. Shared via the system share sheet.
 - **GPX import** — `.gpx` file → activity (`source: gpx_import`).
 - **Stats** — last-7-days distance chart + per-sport totals.
 - **Sample data** — one-time seed (7 activities, all sports, last 7 days,

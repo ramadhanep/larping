@@ -67,7 +67,8 @@ Core/
   Location/
     LocationTracker.swift  CLLocationManager wrapper (one per recording)
   GPXParser.swift          stdlib XMLParser .gpx importer
-  ShareImageComposer.swift 1080x1920 share card (Core Graphics)
+  ShareImageComposer.swift 1080x1920 share card templates (Core Graphics + MapKit snapshot)
+  ShareVideoComposer.swift AVAssetWriter-based animated route video export
   CameraCaptureView.swift  UIImagePickerController bridge (camera)
   BackupService.swift      JSON export + idempotent import (FileDocument)
   SeedData.swift           one-time sample activities (random-walk paths)
@@ -157,9 +158,34 @@ accent:
    Story's reply-input area. Replaced the old plain-text "Larping · actually
    works" watermark.
 
-`ShareActivityView`: renders the plain card immediately on open; Camera |
-Gallery buttons, then a plain-text "Plain background ×" link (shown only when
-a photo is set), then the Share button.
+## Map card template (`ShareImageComposer.composeMapCard(coordinates:stats:)`)
+
+Second template: same header/stats/footer treatment as `compose`, but the
+route sits in a dedicated rounded card (y≈480..1100) containing a real
+`MKMapSnapshotter` render of the route's bounding box, with the route
+redrawn on top in the accent color using the snapshot's own
+`point(for:)` coordinate conversion so it lines up with the tiles exactly.
+Async (network map-tile fetch) — awaited once per open, not per frame.
+
+## Video template (`ShareVideoComposer.composeVideo(coordinates:stats:)`)
+
+Third template: an `AVAssetWriter`-encoded MP4, 1080x1920, 60fps, 6s. Reuses
+`ShareImageComposer.compose(...routeRevealFraction:)` to render each frame
+(plain space-dark background + accent route line + dot marker at the reveal
+tip, same visual language as the classic template's route animation) and
+feeds it through `AVAssetWriterInputPixelBufferAdaptor`. Deliberately not a
+live map: snapshotting real map tiles per frame (360 frames) would mean
+hundreds of network fetches for one export. Generated on demand (not on
+sheet open) since it's the expensive template — a "Generate video" button
+renders it, then it plays inline via `VideoPlayer` and shares as a file URL.
+
+`ShareActivityView`: three templates in a `TabView(.page)` — classic (photo
+or plain background, renders on open), map card (async, loads shortly after
+open), video (renders on demand only). Camera | Gallery | "Plain background
+×" controls only show for the classic template, since the other two don't
+support a custom photo. Each template's Share button pushes the item that
+matches what's on screen (`Image` for the two image templates, the rendered
+file `URL` for video).
 
 ## Backup / restore
 

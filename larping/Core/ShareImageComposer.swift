@@ -1,4 +1,5 @@
 import CoreLocation
+import MapKit
 import UIKit
 
 /// Builds the shareable activity card: the recorded route as an accent-color
@@ -55,6 +56,89 @@ enum ShareImageComposer {
             drawStats(stats, canvasWidth: width)
             drawFooter(canvasWidth: width)
         }
+    }
+
+    /// Second template: a dedicated card with real map imagery (MapKit
+    /// snapshot) and the route overlaid on it, instead of a plain line on a
+    /// flat background. Same header/stats/footer treatment as `compose`.
+    static func composeMapCard(coordinates: [CLLocationCoordinate2D], stats: Stats) async -> UIImage {
+        let width = canvasSize.width
+        let cardRect = CGRect(x: 54, y: 480, width: width - 108, height: 620)
+        let snapshot = coordinates.count > 1 ? await snapshotMap(coordinates: coordinates, size: cardRect.size) : nil
+
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: canvasSize, format: format)
+
+        return renderer.image { context in
+            let bounds = CGRect(origin: .zero, size: canvasSize)
+            let cgContext = context.cgContext
+            spaceBlack.setFill()
+            cgContext.fill(bounds)
+
+            drawHeader(stats, canvasWidth: width)
+
+            let cardPath = UIBezierPath(roundedRect: cardRect, cornerRadius: 28)
+            cgContext.saveGState()
+            cardPath.addClip()
+            if let snapshot {
+                snapshot.image.draw(in: cardRect)
+                UIColor.black.withAlphaComponent(0.15).setFill()
+                cgContext.fill(cardRect)
+                drawRoute(onto: snapshot, coordinates: coordinates, cardRect: cardRect)
+            } else {
+                spaceBlack.setFill()
+                cgContext.fill(cardRect)
+            }
+            cgContext.restoreGState()
+            routeColor.withAlphaComponent(0.6).setStroke()
+            cardPath.lineWidth = 2
+            cardPath.stroke()
+
+            drawStats(stats, canvasWidth: width, startY: cardRect.maxY + 70)
+            drawFooter(canvasWidth: width)
+        }
+    }
+
+    /// Snapshots real map tiles for the route's bounding box, padded so the
+    /// path doesn't touch the card edges.
+    private static func snapshotMap(coordinates: [CLLocationCoordinate2D], size: CGSize) async -> MKMapSnapshotter.Snapshot? {
+        let lats = coordinates.map(\.latitude)
+        let lngs = coordinates.map(\.longitude)
+        let minLat = lats.min()!, maxLat = lats.max()!
+        let minLng = lngs.min()!, maxLng = lngs.max()!
+        let center = CLLocationCoordinate2D(latitude: (minLat + maxLat) / 2, longitude: (minLng + maxLng) / 2)
+        let span = MKCoordinateSpan(
+            latitudeDelta: max((maxLat - minLat) * 1.3, 0.004),
+            longitudeDelta: max((maxLng - minLng) * 1.3, 0.004)
+        )
+
+        let options = MKMapSnapshotter.Options()
+        options.region = MKCoordinateRegion(center: center, span: span)
+        options.size = size
+        options.scale = 1
+        options.mapType = .standard
+        options.showsBuildings = false
+
+        return try? await MKMapSnapshotter(options: options).start()
+    }
+
+    /// Draws the route on top of an already-rendered map snapshot, using the
+    /// snapshot's own coordinate→point conversion so it lines up with the
+    /// tiles exactly.
+    private static func drawRoute(onto snapshot: MKMapSnapshotter.Snapshot, coordinates: [CLLocationCoordinate2D], cardRect: CGRect) {
+        guard coordinates.count > 1 else { return }
+        let path = UIBezierPath()
+        for (index, coordinate) in coordinates.enumerated() {
+            let point = snapshot.point(for: coordinate)
+            let translated = CGPoint(x: cardRect.minX + point.x, y: cardRect.minY + point.y)
+            index == 0 ? path.move(to: translated) : path.addLine(to: translated)
+        }
+        path.lineWidth = 10
+        path.lineJoinStyle = .round
+        path.lineCapStyle = .round
+        routeColor.setStroke()
+        path.stroke()
     }
 
     private static func draw(_ image: UIImage, filling rect: CGRect) {
@@ -161,7 +245,7 @@ enum ShareImageComposer {
     }
 
     /// Stats rendered as one centered column — three rows of label + value.
-    private static func drawStats(_ stats: Stats, canvasWidth: CGFloat) {
+    private static func drawStats(_ stats: Stats, canvasWidth: CGFloat, startY: CGFloat = 1020) {
         let rows: [(String, String)] = [
             ("DISTANCE", stats.distance),
             ("DURATION", stats.duration),
@@ -176,7 +260,7 @@ enum ShareImageComposer {
             .foregroundColor: white,
         ]
 
-        var y: CGFloat = 1020
+        var y: CGFloat = startY
         for row in rows {
             drawCentered(NSAttributedString(string: row.0, attributes: labelAttrs), atY: y, canvasWidth: canvasWidth)
             let value = NSAttributedString(string: row.1, attributes: valueAttrs)
