@@ -73,3 +73,6 @@ will get asked to add it.
   not obvious from the diff.
 - Run the build command above before opening the PR.
 - No formatting-only PRs that touch unrelated files.
+
+CI (`.github/workflows/ci.yml`) runs build + test on every push/PR to `main`
+on a macOS runner — no local-only checks.

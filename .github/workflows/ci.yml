@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          xcodebuild -project larping.xcodeproj -scheme larping \
+            -destination 'generic/platform=iOS Simulator' -configuration Debug build \
+            2>&1 | tee build.log | grep -Ei "error:|BUILD SUCCEEDED|BUILD FAILED"
+          ! grep -q "BUILD FAILED" build.log
+
+      - name: Test
+        run: |
+          xcodebuild -project larping.xcodeproj -scheme larping \
+            -destination 'platform=iOS Simulator,name=iPhone 17' test \
+            2>&1 | tee test.log | grep -Ei "error:|failed|TEST SUCCEEDED"
+          ! grep -q "TEST FAILED" test.log
