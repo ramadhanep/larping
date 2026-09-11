@@ -31,6 +31,15 @@ monochrome accent as background): their label is forced to `.foregroundStyle
 button in dark mode). Destructive buttons (Finish) must NOT get that override
 — iOS renders them red-background/white-text natively.
 
+**Logo assets** (`Assets.xcassets`): `AppIcon.appiconset` (light/dark/tinted,
+1024x1024, generated from the square mark) and `LogoHorizontal.imageset`
+(wordmark, `template-rendering-intent: template` — single alpha-mask PNG,
+recolor per-placement with `.foregroundStyle`/`.tintColor` rather than
+shipping separate black/white files). Both are derived from `logo.png` /
+`logo-horizontal.png` at the repo root, which are raw, oversized design
+sources — never reference them directly from app code; regenerate the
+in-bundle assets from them instead if the source logo changes.
+
 ## Conventions
 
 - `SWIFT_VERSION = 5.0` with `SWIFT_APPROACHABLE_CONCURRENCY = YES` and
