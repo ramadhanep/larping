@@ -20,6 +20,25 @@ anything else:
 Only fall back to reading source directly for the specific file you're about
 to change — not to rebuild context the docs above already have.
 
+## Keeping docs in sync (mandatory)
+
+These docs exist so a session never has to re-scan the source tree. That only
+holds if they stay accurate. Whenever a code change alters something a doc
+describes, update that doc **in the same change**, not as a follow-up:
+
+- New/removed feature, screen, or user-facing behavior → `README.md`
+  (Features) and `docs/ARCHITECTURE.md` (Layer map / relevant section).
+- New/changed file, module, data model field, or convention →
+  `docs/ARCHITECTURE.md`.
+- Notable fix, non-obvious root cause, or completed roadmap item →
+  append to `docs/STATUS.md` (one entry, commit-log style).
+- New workaround, platform gotcha, or gap that looks like a bug but isn't →
+  `docs/KNOWN_ISSUES.md`.
+
+Small, mechanical changes (renames, formatting, refactors with no behavior
+change) don't need a doc update. When in doubt, ask: "would a fresh session
+reading only the docs get this wrong?" If yes, fix the doc.
+
 ## Repo layout
 
 This is the root of the git repo — `larping.xcodeproj` is at top level, next

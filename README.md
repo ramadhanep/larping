@@ -67,3 +67,7 @@ Known non-code warnings that always appear (don't chase them): the
   (paid Apple Developer Program) — today it's manual export to iCloud Drive.
 - Live-record notification (Dynamic Island/Lock Screen) is NOT built — needs
   a Widget Extension target, see `docs/KNOWN_ISSUES.md`.
+
+## Contributing
+
+See `CONTRIBUTING.md` for setup, conventions, and PR process.

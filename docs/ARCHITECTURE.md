@@ -35,7 +35,9 @@ Per-sport color sets (`Sport*`) are dead assets (unused).
 
 ## Conventions
 
-- Swift 6 concurrency, `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`.
+- `SWIFT_VERSION = 5.0` with `SWIFT_APPROACHABLE_CONCURRENCY = YES` and
+  `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` — Swift 6-style concurrency
+  (main-actor-by-default) without full Swift 6 language mode.
 - SwiftData + `@Observable`. `larpingApp` sets
   `.modelContainer(for: [CDActivity.self, CDTrackPoint.self])`. The single
   `ActivitiesStore` is created in `RootTabView` from
@@ -158,3 +160,9 @@ xcodebuild -project larping.xcodeproj -scheme larping \
 Delete `~/Library/Developer/Xcode/DerivedData/larping-*` when testing
 schema-affecting changes, and uninstall the app if the persistent store
 schema changed (see `KNOWN_ISSUES.md`).
+
+## Tests
+
+`larpingTests/` and `larpingUITests/` are unmodified Xcode template scaffolds
+(`testExample`, `testPerformanceExample`, launch test) — no real coverage
+exists yet. Don't go looking for test intent that isn't there.
