@@ -15,6 +15,17 @@ struct RecordView: View {
         NavigationStack {
             ZStack(alignment: .bottom) {
                 Map(position: $cameraPosition) {
+                    // History heatmap: every past route stacked at low opacity —
+                    // overlapping segments blend brighter, giving a "heat" build-up
+                    // without a real spatial-binning pass.
+                    ForEach(activitiesStore.activities) { pastActivity in
+                        let points = activitiesStore.coordinates(for: pastActivity)
+                        if points.count > 1 {
+                            MapPolyline(coordinates: points)
+                                .stroke(Color.accentColor.opacity(0.12), lineWidth: 3)
+                        }
+                    }
+
                     if tracker.routeCoordinates.count > 1 {
                         MapPolyline(coordinates: tracker.routeCoordinates)
                             .stroke(.accent, lineWidth: 5)

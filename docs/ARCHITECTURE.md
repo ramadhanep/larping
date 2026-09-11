@@ -112,6 +112,21 @@ before start; visibility no longer exists. Map is full-bleed
 top-trailing button (no default `mapControls`, which used to poke the status
 bar). GPX import takes the same `create(...)` path from `GPXParser.Result`.
 
+**History heatmap**: the Record map draws every past activity's route
+(`activitiesStore.activities`, capped at 50 by `ActivitiesStore.refresh`) as
+a stacked translucent `MapPolyline` (`Color.accentColor.opacity(0.12)`)
+underneath the live recording polyline. No real spatial-binning pass —
+overlap "heat" is just alpha blending from stacking. Revisit with a proper
+grid-binned intensity pass if the 50-activity cap or blending starts looking
+wrong at higher activity counts.
+
+**Route draw-in animation**: `ActivityDetailView.RouteMap` reveals the route
+polyline progressively over ~1.4s using `TimelineView(.animation(paused:))`
+— it slices `coordinates.prefix(revealedCount)` by elapsed-time fraction, so
+it follows recorded point order (works for loops/backtracks, not just
+point-to-point). Paused after the draw completes so the timeline stops
+ticking.
+
 ## Share card (`ShareImageComposer.compose(photo:coordinates:stats:)`)
 
 Canvas 1080x1920, pure white-on-black, system font, no card/logo/brand color:

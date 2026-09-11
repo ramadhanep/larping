@@ -97,6 +97,11 @@ struct ActivityDetailView: View {
 private struct RouteMap: View {
     let coordinates: [CLLocationCoordinate2D]
 
+    private static let drawDuration: TimeInterval = 1.4
+
+    @State private var startDate = Date()
+    @State private var isDrawComplete = false
+
     private var region: MKCoordinateRegion {
         let lats = coordinates.map(\.latitude)
         let lngs = coordinates.map(\.longitude)
@@ -111,12 +116,23 @@ private struct RouteMap: View {
     }
 
     var body: some View {
-        Map(initialPosition: .region(region)) {
-            MapPolyline(coordinates: coordinates)
-                .stroke(.accent, lineWidth: 4)
+        TimelineView(.animation(paused: isDrawComplete)) { timeline in
+            let progress = min(timeline.date.timeIntervalSince(startDate) / Self.drawDuration, 1)
+            let revealedCount = max(2, Int(Double(coordinates.count) * progress))
+
+            Map(initialPosition: .region(region)) {
+                MapPolyline(coordinates: Array(coordinates.prefix(revealedCount)))
+                    .stroke(.accent, lineWidth: 4)
+            }
+            .mapStyle(.standard)
+            .allowsHitTesting(false)
         }
-        .mapStyle(.standard)
-        .allowsHitTesting(false)
+        .task {
+            startDate = Date()
+            isDrawComplete = false
+            try? await Task.sleep(for: .seconds(Self.drawDuration))
+            isDrawComplete = true
+        }
     }
 }
 
