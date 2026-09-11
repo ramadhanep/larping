@@ -42,9 +42,12 @@ Two warnings always appear and are expected (not yours to fix): the
 `AccentColor` asset-symbol redeclaration, and the `appintentsmetadataprocessor`
 "no AppIntents.framework" note.
 
-`larpingTests`/`larpingUITests` are still empty Xcode template scaffolds — no
-suite to run yet. If you add non-trivial logic (a branch, a parser, a
-calculation), leave a small `XCTestCase` behind for it.
+`larpingTests` has unit coverage for the non-trivial logic (GPX parsing,
+formatters, backup round-trip, share image compose). Run it via Xcode's Test
+navigator or `xcodebuild ... test` (swap `build` for `test` in the command
+above, add a `-destination` with a device name e.g. `platform=iOS
+Simulator,name=iPhone 17`). If you add non-trivial logic (a branch, a
+parser, a calculation), leave a small `XCTestCase` behind for it.
 
 ## Conventions
 

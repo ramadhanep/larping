@@ -161,6 +161,13 @@ schema changed (see `KNOWN_ISSUES.md`).
 
 ## Tests
 
-`larpingTests/` and `larpingUITests/` are unmodified Xcode template scaffolds
-(`testExample`, `testPerformanceExample`, launch test) — no real coverage
-exists yet. Don't go looking for test intent that isn't there.
+`larpingTests/` has real unit coverage for the non-trivial logic:
+`GPXParserTests`, `FormattersTests`, `BackupServiceTests` (round-trip via an
+in-memory `ModelContainer`), `ShareImageComposerTests` (canvas-size smoke
+test). `larpingUITests/` is still the unmodified Xcode template scaffold
+(launch test only). Run via Xcode's Test navigator or:
+
+```bash
+xcodebuild -project larping.xcodeproj -scheme larping \
+  -destination 'platform=iOS Simulator,name=iPhone 17' test
+```
