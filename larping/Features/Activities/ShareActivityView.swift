@@ -10,6 +10,7 @@ struct ShareActivityView: View {
     let coordinates: [CLLocationCoordinate2D]
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @State private var photo: UIImage?
     @State private var photoPickerItem: PhotosPickerItem?
     @State private var showCamera = false
@@ -83,7 +84,7 @@ struct ShareActivityView: View {
                 ) {
                     Label("Share", systemImage: "square.and.arrow.up")
                         .frame(maxWidth: .infinity)
-                        .foregroundStyle(.black)
+                        .foregroundStyle(colorScheme == .dark ? .black : .white)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)

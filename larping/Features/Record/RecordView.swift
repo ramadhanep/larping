@@ -3,6 +3,7 @@ import SwiftUI
 
 struct RecordView: View {
     @Environment(ActivitiesStore.self) private var activitiesStore
+    @Environment(\.colorScheme) private var colorScheme
     @State private var tracker = LocationTracker()
     @State private var elapsedSeconds = 0
     @State private var timer: Timer?
@@ -71,6 +72,10 @@ struct RecordView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+            } else {
+                Label(selectedSport.label, systemImage: selectedSport.symbolName)
+                    .font(.headline)
+                    .foregroundStyle(.accent)
             }
 
             HStack(spacing: 32) {
@@ -91,7 +96,7 @@ struct RecordView: View {
                 } label: {
                     Label("Start", systemImage: "play.fill")
                         .frame(maxWidth: .infinity)
-                        .foregroundStyle(.black)
+                        .foregroundStyle(colorScheme == .dark ? .black : .white)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
