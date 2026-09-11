@@ -1,0 +1,42 @@
+import Foundation
+import SwiftData
+
+@Model
+final class CDActivity {
+    var id = UUID()
+    var sportTypeRaw: String = SportType.run.rawValue
+    var startedAt: Date = Date()
+    var endedAt: Date?
+    var durationSeconds: Int?
+    var distanceMeters: Int?
+    var elevationGainMeters: Int?
+    var averageSpeedMps: Double?
+    var maxSpeedMps: Double?
+    var source: String = "mobile"
+    var createdAt: Date = Date()
+
+    @Relationship(deleteRule: .cascade, inverse: \CDTrackPoint.activity)
+    var trackPoints: [CDTrackPoint] = []
+
+    var sportType: SportType {
+        get { SportType(rawValue: sportTypeRaw) ?? .run }
+        set { sportTypeRaw = newValue.rawValue }
+    }
+
+    @Transient
+    var averagePaceSecondsPerKm: Int? {
+        guard sportType.usesPaceMetric,
+              let averageSpeedMps, averageSpeedMps > 0.1 else { return nil }
+        return Int(1000 / averageSpeedMps)
+    }
+
+    @Transient
+    var calories: Int? {
+        guard let distanceMeters, let durationSeconds, durationSeconds > 0 else { return nil }
+        let km = Double(distanceMeters) / 1000
+        let hours = Double(durationSeconds) / 3600
+        return Int(km * hours * 60)
+    }
+
+    init() {}
+}
