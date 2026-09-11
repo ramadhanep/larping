@@ -24,6 +24,11 @@ to scan the source tree:
   (synchronized file system group); no project-file edits needed for new
   Swift files.
 - No secrets, no `.env`, no backend to run — the app is 100% on-device.
+- The project has the maintainer's `DEVELOPMENT_TEAM` committed in
+  `project.pbxproj` for device-signing convenience. Simulator builds (see
+  below) don't need signing and work as-is. To run on a physical device,
+  change the Team in Xcode → Signing & Capabilities to your own — don't
+  commit that change.
 
 ## Build & verify
 
