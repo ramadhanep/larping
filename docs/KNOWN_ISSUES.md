@@ -85,7 +85,7 @@ Don't drop a font into `larping/` and assume it ships.
 
 ## Prominent-button text contrast is hand-managed
 
-`.borderedProminent` labels on the monochrome accent need
-`.foregroundStyle(Color.canvas)` (Start/Resume/Share). Destructive buttons are
-red+white natively and must NOT get that override. Keep this in mind when
-adding buttons.
+`.borderedProminent` labels on the lime accent need `.foregroundStyle(.black)`
+— fixed, not adaptive, since lime is bright in both light and dark mode
+(Start, Share). Destructive buttons are red+white natively and must NOT get
+that override. Keep this in mind when adding buttons.

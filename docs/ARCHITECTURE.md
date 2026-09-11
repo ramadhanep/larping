@@ -23,13 +23,13 @@ Assets.xcassets color sets with Any/Dark variants; Xcode synthesizes
 | `Muted` | `#6B7280` | `#9CA3AF` | Secondary text |
 | `Border` | `#E5E7EB` | `#374151` | Borders |
 | `Success`/`Error`/`Info`/`Warning` | `#22C55E`/`#EF4444`/`#3B82F6`/`#F59E0B` | same | Status |
-| `Accent` + `AccentColor` | `#000000` | `#FFFFFF` | System tint (adaptive monochrome) |
+| `Accent` + `AccentColor` | `#CEFE06` | `#CEFE06` | System tint — fixed lime, same both modes |
 
-**Contrast rule for prominent buttons** (Start/Resume/Share use the
-monochrome accent as background): their label is forced to `.foregroundStyle
-(Color.canvas)` so text stays readable in both modes (black text on white
-button in dark mode). Destructive buttons (Finish) must NOT get that override
-— iOS renders them red-background/white-text natively.
+**Contrast rule for prominent buttons** (Start/Share use the lime accent as
+background): their label is forced to `.foregroundStyle(.black)` — fixed
+black, not adaptive, since the lime background is bright in both light and
+dark mode. Destructive buttons (Finish) must NOT get that override — iOS
+renders them red-background/white-text natively.
 
 **Logo assets** (`Assets.xcassets`): `AppIcon.appiconset` (light/dark/tinted,
 1024x1024, generated from the square mark) and `LogoHorizontal.imageset`

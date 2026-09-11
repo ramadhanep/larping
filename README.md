@@ -1,8 +1,8 @@
 # Larping (iOS)
 
 SwiftUI iOS app. Brand "Larping", tagline "actually works". Black/white
-monochrome aesthetic (Grok-style space theme), adaptive accent (black in
-light mode, white in dark mode).
+monochrome aesthetic (Grok-style space theme) with a fixed lime accent
+(`#CEFE06`, same in light and dark mode).
 
 **Fully offline, no server, no account.** All data is stored on-device in
 SwiftData (SQLite) — there is zero networking in this app. Think Strava, but

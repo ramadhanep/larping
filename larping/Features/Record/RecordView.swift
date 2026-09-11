@@ -80,7 +80,7 @@ struct RecordView: View {
                 } label: {
                     Label("Start", systemImage: "play.fill")
                         .frame(maxWidth: .infinity)
-                        .foregroundStyle(Color.canvas)
+                        .foregroundStyle(.black)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)

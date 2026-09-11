@@ -83,7 +83,7 @@ struct ShareActivityView: View {
                 ) {
                     Label("Share", systemImage: "square.and.arrow.up")
                         .frame(maxWidth: .infinity)
-                        .foregroundStyle(Color.canvas)
+                        .foregroundStyle(.black)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
