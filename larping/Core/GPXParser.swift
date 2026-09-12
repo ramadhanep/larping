@@ -10,6 +10,22 @@ enum GPXParser {
         let elevationGainMeters: Double
         let startedAt: Date?
         let endedAt: Date?
+        /// Detected sport (GPX `<type>`), nil when unknown/absent — the import
+        /// UI then keeps the user's/picker's default.
+        let sportType: SportType?
+    }
+
+    /// Maps a GPX `<type>` value onto Larping sports (case-insensitive
+    /// substring match — files disagree on casing: "Running", "cycling_sport",
+    /// "hiking", "Open Water", …). Unknown values → nil.
+    static func sportType(from type: String) -> SportType? {
+        let value = type.lowercased()
+        if value.contains("run") || value.contains("jogg") { return .run }
+        if value.contains("cycl") || value.contains("rid") || value.contains("bike") || value.contains("bicycl") { return .ride }
+        if value.contains("walk") { return .walk }
+        if value.contains("hik") || value.contains("trail") { return .hike }
+        if value.contains("swim") { return .swim }
+        return nil
     }
 
     enum ParseError: LocalizedError {
@@ -58,11 +74,12 @@ enum GPXParser {
         }
 
         return Result(
-            trackPoints: trackPoints,
+trackPoints: trackPoints,
             distanceMeters: distanceMeters,
             elevationGainMeters: elevationGainMeters,
             startedAt: delegate.points.first?.time,
-            endedAt: delegate.points.last?.time
+            endedAt: delegate.points.last?.time,
+            sportType: delegate.type.flatMap(GPXParser.sportType(from:))
         )
     }
 
@@ -75,6 +92,7 @@ enum GPXParser {
 
     private final class Delegate: NSObject, XMLParserDelegate {
         var points: [Point] = []
+        var type: String?
         private var currentText = ""
         private var current: Point?
 
@@ -96,6 +114,8 @@ enum GPXParser {
                 current?.elevation = Double(currentText.trimmingCharacters(in: .whitespacesAndNewlines))
             case "time":
                 current?.time = ISO8601DateFormatter.parse(currentText.trimmingCharacters(in: .whitespacesAndNewlines))
+            case "type":
+                type = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
             case "trkpt":
                 if let current { points.append(current) }
                 current = nil

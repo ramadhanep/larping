@@ -58,7 +58,7 @@ wordmark no longer needs to adapt per appearance mode.
   `ActivitiesStore` is created in `RootTabView` from
   `@Environment(\.modelContext)` and injected via `.environment(_:)`.
 - `@Query` in `ActivitiesListView` keeps the list in sync automatically.
-- No third-party dependencies. stdlib/SwiftUI/UIKit/MapKit/CoreLocation only
+- No third-party dependencies. stdlib/SwiftUI/UIKit/MapKit/CoreLocation/HealthKit only
   (no PhotosUI — Profile has no photo upload, see below). System font
   everywhere (a bundled Domine font was tried and removed — the synchronized
   group does not copy `.ttf` resources).
@@ -83,24 +83,32 @@ Core/
   SeedData.swift           one-time sample activities (random-walk paths)
   Formatters.swift         distance/duration/pace/speed/elevation + ISO parse
   AppearanceMode.swift     light/dark/system toggle
+  Health/
+    HealthKitService.swift optional HealthKit interop — write: finished activity →
+                          HKWorkout (+ route); read: recent HR samples,
+                          workout routes (healthkit_import source).
 
 Features/
-  Root/          RootTabView — 4 tabs (Activities, Record, Stats, Profile)
+  Root/          RootTabView — 4 tabs (Activities, Record, Stats, Profile),
+                  SplashView — animated launch splash (logo, theme-aware)
   Record/        RecordView — live map, auto-save on finish, event name + auto-fill
   Activities/    ActivitiesListView (@Query), ActivityDetailView (hero map),
-                  ImportGPXView, ShareActivityView, ActivitiesStore
+                  ImportGPXView, ImportHealthKitView, ShareActivityView, ActivitiesStore
   Stats/         StatsView — Swift Charts last-7-days + all-time + per-sport + personal bests
   Profile/       ProfileView — cover card (fixed gradient, no photo upload) + name/bio, appearance, backup export/import
 ```
 
 ## Data model
 
-`CDActivity`: `id`, `sportTypeRaw`, `startedAt`/`endedAt`, `durationSeconds`,
-`distanceMeters`, `elevationGainMeters`, `averageSpeedMps`, `maxSpeedMps`,
-`source` (`mobile` | `gpx_import` | `sample`), `eventName` (optional user title;
+`CDActivity`: `id`, `sportTypeRaw`, `startedAt`/`endedAt`, `durationSeconds`
+(**active/moving** time — pauses excluded; computed by `LocationTracker`, not
+wall clock), `distanceMeters`, `elevationGainMeters`, `averageSpeedMps`, `maxSpeedMps`,
+`source` (`mobile` | `gpx_import` | `healthkit_import` | `sample`), `eventName` (optional user title;
 `EventNamer` ensures "Larping <Sport> N" auto names never collide), `createdAt`,
 cascade `[CDTrackPoint]`.
-`averagePaceSecondsPerKm`/`calories` are `@Transient` computed.
+`averagePaceSecondsPerKm`/`calories` are `@Transient` computed, as are
+`maxHeartRateBpm`/`averageHeartRateBpm` (derived from track points; nil for
+live recordings, populated for HealthKit imports).
 `CDTrackPoint`: `timestamp`, `lat/lng`, `altitudeMeters`, `speedMps`, optional
 heart rate/cadence (always nil today).
 
@@ -121,6 +129,12 @@ card cannot be customized with a photo (no `PhotosPicker`, no
 with a darkening scrim.
 
 ## Startup & seeding
+
+`larpingApp` shows a brief animated `SplashView` (logo wordmark, white in
+dark / black in light mode over the `Canvas` background, ~1.4s then fades)
+while booting. The static pre-SwiftUI launch screen is the same `Canvas`
+background via `UILaunchScreen` in the explicit `Info.plist`, so the handoff
+never flashes white/black.
 
 `RootTabView.task` → `SeedData.seedIfNeeded(context:)` then creates +
 refreshes `ActivitiesStore`. Seed inserts 7 activities (one per sport +
@@ -145,11 +159,32 @@ form legible, translucent enough that the map still shows through faintly;
 light mode keeps `.thinMaterial`. On **Finish** it calls
 `tracker.stop()`, then `ActivitiesStore.create(...)` **immediately** (auto-
 save — no form, no discard path), storing the event name (auto name when left
-blank), and shows a "saved" alert. The recording header is a row — sport
-bouncing icon left, event name right (no centered label). Map is full-bleed
+blank), and shows a "saved" alert. Only after the local save succeeds does a
+fire-and-forget `Task { await HealthKitService.saveWorkout(from: activity) }`
+optionally mirror the workout into the Health app (see "HealthKit" below) —
+HealthKit failure or denial never blocks or loses the local save.
+
+**Active duration**: `startedAt`/`endedAt` keep true wall-clock timestamps,
+but `durationSeconds` (and the pace/avg-speed it feeds) is **active time
+only** — `LocationTracker` accumulates each recording interval at
+start/pause/resume/finish boundaries (sub-second-precise `activeTime`, whole-
+second `elapsedSeconds` for the on-screen timer). Pausing freezes both; a long
+pause can never inflate a 20-minute run into 40. Stored this way,
+live recordings, GPX, and HealthKit imports all carry a meaningful moving time. The recording header is a row — sport
+bouncing icon left, event name right (no centered label). While **paused** the
+header sport icon drops to `.secondary` color (bounce stops) and a small
+`PAUSED` capsule appears next to it so the state is distinct at a glance;
+recording never restarts until Resume. When the GPS fix degrades
+(`horizontalAccuracy` invalid or `>= 50m`) during recording, points are
+dropped as before but a small warning-colored "GPS signal weak" note appears
+under the stat row (`LocationTracker.isGPSDegraded`, reset per recording) —
+recording continues silently otherwise. Map is full-bleed
 (`.ignoresSafeArea(edges: .top)`); the recenter control is a toolbar
 top-trailing button (no default `mapControls`, which used to poke the status
-bar). GPX import takes the same `create(...)` path from `GPXParser.Result`.
+bar). GPX import takes the same `create(...)` path from `GPXParser.Result`,
+which also surfaces a sport auto-detected from the file's `<type>` element
+(`GPXParser.sportType(from:)`, substring match, unknown → nil keeps the
+picker default).
 
 **Live rider marker**: while `tracker.state != .idle`, the default
 `UserAnnotation()` blue dot is swapped for an `Annotation` at
@@ -160,15 +195,17 @@ bounce) — same visual language as the detail-view rider. Icon color is
 accent fill is lime in dark mode — a white icon there had poor contrast.
 Falls back to `UserAnnotation()` before a route exists.
 
-**Nav bar tint**: in dark mode only, Record's nav bar gets
-`.toolbarBackground(Color.black.opacity(0.75), for: .navigationBar)` +
-`.toolbarColorScheme(.dark, for: .navigationBar)` so the liquid-glass bar
-matches the black bottom card instead of rendering a mismatched light glass
-over it. Light mode is untouched (default automatic glass, matching the
-card's `.thinMaterial`).
+**Nav/bar treatment**: Record is the immersive tab — the **top** nav bar has
+no tint at all (transparent, map runs full-bleed behind the status bar; the
+recenter button stays as a plain toolbar item). Instead the `Color.black.
+opacity(0.75)` overlay moved to the **bottom tab bar** so the map's dark control
+card reads as one block down to the tab bar. Applied with `.toolbarBackground`/
+`.toolbarColorScheme(.dark, for: .tabBar)` but only from Record's own view
+(scoped per-tab) — Activities/Stats/Profile keep the default liquid-glass tab
+bar and their default nav bars. Light mode untouched (automatic).
 
 **History heatmap**: the Record map draws every past activity's route
-(`activitiesStore.activities`, capped at 50 by `ActivitiesStore.refresh`) as
+(`activitiesStore.activities`, capped at 500 by `ActivitiesStore.refresh`) as
 a stacked translucent `MapPolyline` (`Color.accentColor.opacity(0.12)`)
 underneath the live recording polyline. No real spatial-binning pass —
 overlap "heat" is just alpha blending from stacking. Revisit with a proper
@@ -291,10 +328,11 @@ generic sport label, matching how Detail/Share already prioritize the event
 title.
 
 `StatsView` keeps the last-7-days chart + per-sport section (now also shows
-total time and activity count per sport, not just distance) and adds two
-all-time sections: raw totals (distance/time/activity count across
-everything ever recorded) and "Personal bests" (longest single-activity
-distance and longest single-activity duration, each with their sport icon).
+total time, activity count, and max heart rate per sport when any activity
+carries one) and adds two all-time sections: raw totals
+(distance/time/activity count across everything ever recorded) and "Personal
+bests" (longest single-activity distance, longest single-activity duration,
+and highest max heart rate, each with their sport icon).
 
 ## Backup / restore
 
@@ -304,7 +342,52 @@ JSON, ISO dates) → system `fileExporter` (Files/iCloud Drive/Mail).
 `BackupService.restore(from:into:)` decodes the same shape and re-materializes
 records, **skipping ids that already exist** (idempotent — never duplicates
 or deletes) and rejecting junk/non-Larping files. `ProfileView` has both
-"Export all activities" and "Import backup".
+"Export all activities" and "Import backup", and stamps `@AppStorage
+"lastBackupDate"` on each success — shown in the Backup section as
+"Last backup: …".
+
+## HealthKit write layer
+
+Optional interop, deliberately decoupled: **SwiftData stays the source of
+truth**, HealthKit is a best-effort mirror. `Core/Health/HealthKitService.swift`
+(single `enum`, no protocols — matches `BackupService`/`GPXParser` shape)
+provides availability, auth, and `saveWorkout(from:)`. Profile gains a
+"Health" section (only when `HKHealthStore.isHealthDataAvailable()`) with an
+"Allow HealthKit access" button calling `requestAuthorization()`; authorized
+state reads `authorizationStatus(for: .workoutType())`.
+
+`saveWorkout(from:)` guards on availability + share authorization, builds an
+`HKWorkout` (sport mapped via `HKWorkoutActivityType(sport:)`, duration,
+GPS distance) then `HKWorkoutRouteBuilder.insertRouteData` +
+`finishRoute(with:)` for the polyline. Route samples re-report accuracy at the
+recorder's accepted ceiling (50m horizontal — never overstated; the recorder
+drops worse fixes). Active energy is deliberately not written — Larping's
+calorie value is a crude formula and isn't worth putting into Health as
+measured data. The write uses the `HKWorkout(activityType:start:end:...)`
+initializer (deprecated in iOS 17 in favor of `HKWorkoutBuilder`) — the
+builder targets live session collection and is far more machinery than a
+post-hoc write warrants; the deprecated init remains fully functional.
+
+## HealthKit read / import
+
+`requestAuthorization` also asks read access for workouts, routes, and heart
+rate. `ActivitiesListView`'s Import toolbar became a `Menu` (GPX +
+"Import from Health"), presenting `ImportHealthKitView` when
+`HKHealthStore.isHealthDataAvailable()`. The import sheet shows the most
+recent Health workouts (`fetchRecentWorkouts`); choosing one lets the sport
+type be overridden and shows a summary, then Import materializes it through
+the same `ActivitiesStore.create` path as GPX with `source: "healthkit_import"`
+and an `eventName` auto-name from `EventNamer`.
+
+Route polyline (`fetchRoute`, empty workouts import as metadata-only) and
+heart rate (`heartRateSamples`, oldest→newest, matched to each track point at
+or before its timestamp, `heartRateBpm` filled when available) come along
+when the Health store has them. Distance prefers `HKWorkout.totalDistance`,
+else sums the route; elevation/max speed derive from the route. Fallbacks:
+HealthKit unavailable → the menu entry and sheet prompt are hidden;
+authorization denied → explanation + "Open Settings" (or "Allow HealthKit
+access" while notDetermined); no workouts → `ContentUnavailableView` empty
+state. Nothing is fabricated when route/HR are missing.
 
 ## Info.plist gotchas
 
@@ -313,9 +396,15 @@ via `INFOPLIST_FILE` (contains `UIBackgroundModes: [location]`). Reason:
 array-typed keys like `UIBackgroundModes` are NOT synthesized by generic
 `INFOPLIST_KEY_*`; the explicit file needs a
 `PBXFileSystemSynchronizedBuildFileExceptionSet` (`membershipExceptions =
-Info.plist`) or Xcode would also copy it as a bundle resource. Scalar keys
-(NSCameraUsageDescription, NSPhotoLibraryAddUsageDescription,
-NSLocationAlwaysAndWhenInUseUsageDescription) work via build settings.
+Info.plist, larping.entitlements`) or Xcode would also copy it as a bundle
+resource. It also carries `UILaunchScreen` (`UIColorName = Canvas`) so the
+static launch screen matches the animated splash's color in both modes.
+Scalar keys (NSCameraUsageDescription, NSPhotoLibraryAddUsageDescription,
+NSLocationAlwaysAndWhenInUseUsageDescription, NSHealthShareUsageDescription,
+NSHealthUpdateUsageDescription) work via build settings. HealthKit capability:
+`com.apple.HealthKit` in target `SystemCapabilities` +
+`larping/larping.entitlements` (`com.apple.developer.healthkit`) referenced by
+`CODE_SIGN_ENTITLEMENTS` — excluded from the synced group like `Info.plist`.
 
 ## Build & verify
 

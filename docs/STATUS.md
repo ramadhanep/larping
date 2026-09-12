@@ -282,12 +282,168 @@ Root causes worth remembering:
   compliant API to remove it, so this was intentionally left as-is (see
   `docs/KNOWN_ISSUES.md`).
 
+## `(pending)` — Record correctness pass: product name, fetch cap, GPS + pause feedback
+
+- **Product-name fix.** Location permission strings said "LarpingRun"
+  (old working title) — all four `INFOPLIST_KEY_NSLocation*UsageDescription`
+  values in both Debug/Release build configs now say "Larping".
+- **ActivitiesStore fetch cap raised.** `refresh()` was capped at 50 most-
+  recent activities, silently dropping older ones from the Record history
+  heatmap. Now 500 — bounded enough to keep the heatmap from piling up
+  hundreds of routes while covering realistic activity counts. (The
+  Activity list itself never had this problem — it's `@Query`-driven.)
+- **GPS-degraded feedback.** `LocationTracker` used to silently drop points
+  with `horizontalAccuracy >= 50` (or invalid) while recording. New
+  `isGPSDegraded` flag (set per received fix, reset on `start()`) drives a
+  small warning-colored "GPS signal weak" note under Record's stat row —
+  recording behavior unchanged, no fabricated points.
+- **Pause is now visually distinct.** Pausing keeps the existing card/layout
+  but the header sport icon drops to `.secondary` (bounce stops) and a red
+  `PAUSED` capsule appears next to it.
+
+## `(pending)` — HealthKit write (optional workout export)
+
+- **New `Core/Health/HealthKitService.swift`.** Single flat `enum` (matches
+  `BackupService`/`GPXParser` shape) with availability check, share-auth
+  request, and `saveWorkout(from:)`. Writes an `HKWorkout` (sport mapped via
+  `HKWorkoutActivityType(sport:)`, duration, GPS distance) and attaches the
+  route polyline via `HKWorkoutRouteBuilder.insertRouteData` +
+  `finishRoute(with:)`. Route samples re-report accuracy at the recorder's
+  accepted 50m ceiling (honest — never overstated). Active energy not written:
+  Larping's calorie figure is a crude formula, not measured data.
+- **Project config.** `com.apple.HealthKit` in target `SystemCapabilities`,
+  new `larping/larping.entitlements` (`com.apple.developer.healthkit`,
+  referenced by `CODE_SIGN_ENTITLEMENTS`, added to the synced-group
+  `membershipExceptions` like `Info.plist`), and
+  `INFOPLIST_KEY_NSHealthShare/UpdateUsageDescription` build settings for
+  scalar-key security copy. `import HealthKit` auto-links; no pbxproj
+  framework phase needed.
+- **Profile "Health" section** (shown only when
+  `HKHealthStore.isHealthDataAvailable()`) with an opt-in
+  "Allow HealthKit access" button; reflecting on re-appear.
+- **Record Finish hook.** The local SwiftData save happens first and
+  unconditionally; only after it succeeds does a fire-and-forget
+  `Task { await HealthKitService.saveWorkout(from: activity) }` mirror the
+  workout. HealthKit denial/absence/failure never blocks or loses a
+  recording.
+- No data-model schema change (no stored active-energy field — not needed for
+  an energy-less write).
+
+## `(pending)` — HealthKit read / import (Watch workouts into Larping)
+
+- **`HealthKitService` read side.** `fetchRecentWorkouts(limit:)`,
+  `fetchRoute(for:)` (HKSampleQuery for `HKWorkoutRoute` + `HKWorkoutRouteQuery`,
+  continuation-based), `heartRateSamples(for:)` (windowed HKSampleQuery,
+  gated on read auth). `requestAuthorization` now also requests read for
+  workouts/routes/heart-rate. `SportType(workoutActivityType:)` back-maps
+  Apple's activity types (unknown types → `.other`).
+- **`ImportHealthKitView`** mirrors `ImportGPXView`: newest workouts list,
+  sport-type override picker, summary, single Import action. Route polyline →
+  track points (`source: "healthkit_import"`), heart rate merged onto the
+  nearest point at-or-before its timestamp (`heartRateBpm` finally populated
+  for Watch-recorded activities); distance prefers `HKWorkout.totalDistance`
+  else route sum; elevation/max speed from route. No route/HR → imports
+  metadata-only. Graceful paths: unavailable (menu entry hidden), denied
+  (explanation + Open Settings), empty store (`ContentUnavailableView`).
+- **Activities toolbar** became an Import `Menu` (GPX + HealthKit) — GPX
+  import itself unchanged.
+- Import goes through the existing `ActivitiesStore.create` path, so backups,
+  rename, share, stats all work identically.
+
+## `(pending)` — Heart-rate display, backup timestamp, GPX sport autodetect
+
+- **Heart-rate stats finally visible.** Imported HealthKit activities carry
+  HR samples but nothing displayed them. `CDActivity` gains `@Transient`
+  `maxHeartRateBpm`/`averageHeartRateBpm` (derived from track points);
+  `ActivityDetailView` shows Avg HR / Max HR stat tiles when present; Stats
+  adds per-sport "max N bpm" and a "Highest heart rate" personal best. Live
+  iPhone recordings still have no HR — tiles just stay hidden (nil).
+- **Last-backup timestamp.** Profile stamps `@AppStorage("lastBackupDate")`
+  on every successful export and import and shows "Last backup: …" in the
+  Backup section — a cheap answer to "when did I last back up?".
+- **GPX sport auto-detect.** `GPXParser` captures the `<type>` element;
+  `sportType(from:)` maps it (case-insensitive substring: run/cycl/rid/bike/
+  walk/hik/trail/swim; unknown → nil). `ImportGPXView` pre-selects the
+  detected sport when parsing a file, overriding the `.run` default.
+  Substring order matters: "trail run" counts as Run (run checked before
+  trail), "Cycling_Sport"→Ride. Covered by two new `GPXParserTests`.
+
+## `(pending)` — Splash screen + immersive Record tab
+
+- **Animated splash.** `SplashView` (Features/Root) overlays the app on
+  launch: `LogoHorizontal` wordmark over `Color.canvas`, tinted white in dark
+  mode / black in light mode via `colorScheme` (the template asset recolors —
+  no new PNGs). `larpingApp` fades it out after ~1.4s. The static launch
+  screen previously flashed system white/black ahead of the app; the explicit
+  `Info.plist` now sets `UILaunchScreen` with `UIColorName = Canvas` so the
+  pre-SwiftUI phase matches the splash in both modes — seamless handoff.
+- **Record's dark overlay moved from top nav to bottom tab bar.** The old
+  `toolbarBackground(Color.black.opacity(0.75), for: .navigationBar)` +
+  dark scheme made the Record nav bar a black strip over the map. Removed —
+  the top is now transparent full-bleed (no title, recenter button remains
+  top-trailing). The same black overlay is re-applied to the bottom **tab
+  bar**, scoped with `.toolbarBackground(…, for: .tabBar)` from Record's own
+  view, so in dark mode the map + bottom control card + tab bar read as one
+  dark block. Other tabs keep the default liquid-glass tab bar untouched.
+  Light mode unchanged (automatic).
+
+## `(pending)` — Active duration fix (pause no longer inflates duration/pace)
+
+Root cause: `LocationTracker.stop()` stored `endedAt - startedAt` (wall clock),
+so pausing inflated `durationSeconds`, average pace, and average speed.
+The on-screen timer was already pause-aware, but as a separate `@State`
+`elapsedSeconds` in `RecordView` — two clocks, one right and one wrong.
+
+Fix keeps active-duration state in the session logic (`LocationTracker`), not
+the UI:
+- `LocationTracker` now owns the clock: `activeTime` (sub-second-precise
+  `TimeInterval`) accumulated per recording interval at start/pause/resume/
+  finish boundaries, plus `elapsedSeconds` (whole-second view) driving the
+  on-screen timer via its own 1s tick. `startedAt`/`endedAt` remain real
+  wall-clock timestamps.
+- `Recording` gains `activeDurationSeconds` + `durationSeconds` (Int).
+  `RecordView`'s own timer is gone — the tracker is the single source of
+  truth for both display and persistence.
+- `durationSeconds` stored = `activeTime` floored; `averageSpeedMps` divides
+  distance by `activeDurationSeconds` (guarded `> 0.5s` for near-zero
+  recordings). Distance, elevation, calories unchanged; GPX/HealthKit import
+  paths untouched (GPX has no pause concept; HealthKit uses Apple's own
+  active duration).
+- Injectable `currentDate` clock seam (default `Date()`) lets tests drive
+  start/pause/resume/finish deterministically — no real sleeps.
+
+New `LocationTrackerTests` (fake clock, `@MainActor`): no pause, single
+pause (the 10'/20'/10' example → active 20'), multiple pause/resume
+accumulation, finish-while-paused, finish-while-recording, near-zero
+duration safety, and `elapsedSeconds` tracking.
+
 ## Next / not built
 
+Deferred / do-not-build items, so a fresh session doesn't re-propose them:
+
 - **Live-record notification** (Dynamic Island / Lock Screen with
-  Pause/Finish actions) — needs an ActivityKit **Widget Extension target**
+  Pause/Finish actions) — needs ActivityKit **Widget Extension target**
   (UI cannot be defined from the main app); deferred. Adding it requires a new
   Xcode target, best added via Xcode GUI (File → New Target → Widget
   Extension) or careful pbxproj surgery.
-- Scheduled/automatic backup.
-- Restore duplicate-conflict resolution beyond skip.
+- **Scheduled/automatic backup** — background app refresh + notification +
+  file-conflict resolution; current manual export/import is sufficient.
+- **Restore duplicate-conflict resolution** beyond skip — edge case for
+  multi-device power users; "skip existing" is safe and correct.
+- **Apple Watch companion app** — separate watchOS codebase/product decision;
+  out of scope by design (this is an iPhone recorder).
+- **Cloud sync / iCloud entitlement** — needs paid Apple Developer Program;
+  changes the fundamental architecture. Backup via iCloud Drive suffices.
+- **Social features** (feeds/followers) — contrary to "private by
+  construction".
+- **Workout auto-detection** — significant ML/HealthKit complexity; manual
+  Start is clear UX.
+- **Custom/user-defined sports** — model migration + share-template changes;
+  the current 6 sports cover real use.
+- **Step cadence display** — Watch exposes steps/min, not RPM; the field stays
+  `cadenceRpm` and unpopulated for now (see `KNOWN_ISSUES.md`).
+- **Resting HR / VO2 max** — needs `HKQuantityType` reads + personal-best
+  enrichment; nice-to-have, low impact.
+- **HealthKit active energy / calories** — energy deliberately not written to
+  Health (crude local formula); a stored `activeEnergyKiloJoules` field and
+  real energy imports would be needed for accuracy.

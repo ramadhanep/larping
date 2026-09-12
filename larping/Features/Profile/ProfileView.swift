@@ -9,6 +9,7 @@ struct ProfileView: View {
     @AppStorage("appearanceMode") private var appearanceMode = AppearanceMode.system
     @AppStorage("displayName") private var displayName = "Larping User"
     @AppStorage("bio") private var bio = "Chasing routes, one recording at a time."
+    @AppStorage("lastBackupDate") private var lastBackupDate = ""
     @State private var showEdit = false
     @State private var exportDocument: BackupFile?
     @State private var showExporter = false
@@ -16,6 +17,7 @@ struct ProfileView: View {
     @State private var pendingImportURL: URL?
     @State private var confirmImport = false
     @State private var backupMessage: String?
+    @State private var healthAuthorized = HealthKitService.isAuthorized
 
     var body: some View {
         NavigationStack {
@@ -102,7 +104,7 @@ struct ProfileView: View {
                                 .padding(.vertical, 8)
                                 .background(
                                     isSelected ? Color.accentColor : Color.clear,
-                                    in: RoundedRectangle(cornerRadius: 8)
+                                    in: RoundedRectangle(cornerRadius: 20)
                                 )
                                 .foregroundStyle(
                                     isSelected
@@ -114,7 +116,7 @@ struct ProfileView: View {
                         }
                     }
                     .padding(4)
-                    .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))
+                    .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 20))
                     .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
                 }
 
@@ -132,6 +134,31 @@ struct ProfileView: View {
                     Label("Export a backup JSON and save it to iCloud Drive or Files to keep your data safe across devices and reinstalls.", systemImage: "icloud")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                    if let lastBackupDate = ISO8601DateFormatter.parse(lastBackupDate) {
+                        Label("Last backup: \(Formatters.displayDate(date: lastBackupDate))", systemImage: "clock")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if HealthKitService.isAvailable {
+                    Section("Health") {
+                        Button {
+                            Task {
+                                await HealthKitService.requestAuthorization()
+                                healthAuthorized = HealthKitService.isAuthorized
+                            }
+                        } label: {
+                            Label(
+                                healthAuthorized ? "HealthKit connected" : "Allow HealthKit access",
+                                systemImage: healthAuthorized ? "heart.fill" : "heart.text.square"
+                            )
+                        }
+                        .disabled(healthAuthorized)
+                        Label("Finished activities are written to the Health app alongside your other workouts. Recording always works with or without it.", systemImage: "heart")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Section {
@@ -143,6 +170,7 @@ struct ProfileView: View {
                 .listRowBackground(Color.clear)
             }
             .navigationTitle("Profile")
+            .onAppear { healthAuthorized = HealthKitService.isAuthorized }
             .sheet(isPresented: $showEdit) {
                 EditProfileView(displayName: displayName, bio: bio) { name, newBio in
                     displayName = name
@@ -158,6 +186,7 @@ struct ProfileView: View {
                 switch result {
                 case .success:
                     backupMessage = nil
+                    markBackupMade()
                 case .failure(let error):
                     backupMessage = error.localizedDescription
                 }
@@ -214,6 +243,10 @@ struct ProfileView: View {
         }
     }
 
+    private func markBackupMade() {
+        lastBackupDate = ISO8601DateFormatter().string(from: Date())
+    }
+
     private func performImport() {
         defer { pendingImportURL = nil }
         guard let pendingImportURL else { return }
@@ -226,6 +259,7 @@ struct ProfileView: View {
             let data = try Data(contentsOf: pendingImportURL)
             let (imported, skipped) = try BackupService.restore(from: data, into: modelContext)
             activitiesStore.refresh()
+            markBackupMade()
             backupMessage = skipped > 0
                 ? "Imported \(imported) activities. Skipped \(skipped) already present."
                 : imported == 1 ? "Imported 1 activity." : "Imported \(imported) activities."

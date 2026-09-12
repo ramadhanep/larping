@@ -30,4 +30,33 @@ final class GPXParserTests: XCTestCase {
             }
         }
     }
+
+    func testDetectsSportFromType() throws {
+        let cycling = """
+        <?xml version="1.0"?><gpx><trk><type>Cycling_Sport</type><trkseg>
+          <trkpt lat="1.0" lon="1.0"></trkpt>
+          <trkpt lat="1.001" lon="1.0"></trkpt>
+        </trkseg></trk></gpx>
+        """
+        let cycled = try GPXParser.parse(data: cycling.data(using: .utf8)!)
+        XCTAssertEqual(cycled.sportType, .ride)
+
+        let hiking = """
+        <?xml version="1.0"?><gpx><trk><type>hiking</type><trkseg>
+          <trkpt lat="1.0" lon="1.0"></trkpt>
+          <trkpt lat="1.001" lon="1.0"></trkpt>
+        </trkseg></trk></gpx>
+        """
+        XCTAssertEqual(try GPXParser.parse(data: hiking.data(using: .utf8)!).sportType, .hike)
+    }
+
+    func testUnknownTypeFallsBackToNil() throws {
+        let mystery = """
+        <?xml version="1.0"?><gpx><trk><type>knitting</type><trkseg>
+          <trkpt lat="1.0" lon="1.0"></trkpt>
+          <trkpt lat="1.001" lon="1.0"></trkpt>
+        </trkseg></trk></gpx>
+        """
+        XCTAssertNil(try GPXParser.parse(data: mystery.data(using: .utf8)!).sportType)
+    }
 }

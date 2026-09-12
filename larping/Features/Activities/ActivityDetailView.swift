@@ -83,6 +83,12 @@ struct ActivityDetailView: View {
                     if let calories = activity.calories {
                         StatTile(title: "Calories", value: "\(calories) kcal")
                     }
+                    if let avgHR = activity.averageHeartRateBpm {
+                        StatTile(title: "Avg HR", value: "\(avgHR) bpm")
+                    }
+                    if let maxHR = activity.maxHeartRateBpm {
+                        StatTile(title: "Max HR", value: "\(maxHR) bpm")
+                    }
                 }
             }
             .padding()

@@ -28,7 +28,8 @@ struct StatsView: View {
                     sport: sport,
                     distanceMeters: activities.reduce(0.0) { $0 + Double($1.distanceMeters ?? 0) },
                     durationSeconds: activities.reduce(0) { $0 + ($1.durationSeconds ?? 0) },
-                    count: activities.count
+                    count: activities.count,
+                    maxHeartRateBpm: activities.compactMap(\.maxHeartRateBpm).max()
                 )
             }
             .sorted { $0.distanceMeters > $1.distanceMeters }
@@ -46,6 +47,10 @@ struct StatsView: View {
 
     private var longestDurationActivity: CDActivity? {
         store.activities.max { ($0.durationSeconds ?? 0) < ($1.durationSeconds ?? 0) }
+    }
+
+    private var highestHeartRateActivity: CDActivity? {
+        store.activities.max { ($0.maxHeartRateBpm ?? 0) < ($1.maxHeartRateBpm ?? 0) }
     }
 
     var body: some View {
@@ -84,7 +89,7 @@ struct StatsView: View {
                                 VStack(alignment: .trailing, spacing: 2) {
                                     Text(Formatters.distance(meters: entry.distanceMeters))
                                         .foregroundStyle(.secondary)
-                                    Text("\(Formatters.duration(seconds: entry.durationSeconds)) · \(entry.count) \(entry.count == 1 ? "activity" : "activities")")
+                                    Text("\(Formatters.duration(seconds: entry.durationSeconds)) · \(entry.count) \(entry.count == 1 ? "activity" : "activities")\(entry.maxHeartRateBpm.map { " · max \($0) bpm" } ?? "")")
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
                                 }
@@ -126,6 +131,13 @@ struct StatsView: View {
                                 value: Formatters.duration(seconds: duration)
                             )
                         }
+                        if let highestHeartRateActivity, let heartRate = highestHeartRateActivity.maxHeartRateBpm {
+                            BestRow(
+                                title: "Highest heart rate",
+                                sport: highestHeartRateActivity.sportType,
+                                value: "\(heartRate) bpm"
+                            )
+                        }
                     }
                 }
             }
@@ -145,6 +157,7 @@ private struct SportTotal: Identifiable {
     let distanceMeters: Double
     let durationSeconds: Int
     let count: Int
+    let maxHeartRateBpm: Int?
     var id: SportType { sport }
 }
 

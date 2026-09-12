@@ -17,17 +17,31 @@ final class LocationTracker: NSObject, CLLocationManagerDelegate {
     private(set) var currentSpeedMps: Double = 0
     private(set) var maxSpeedMps: Double = 0
     private(set) var elevationGainMeters: Double = 0
+    private(set) var isGPSDegraded = false
     private(set) var authorizationStatus: CLAuthorizationStatus
+    private(set) var elapsedSeconds = 0
 
     private var trackPoints: [TrackPointPayload] = []
     private let manager = CLLocationManager()
     private var lastLocation: CLLocation?
     private var lastAltitude: Double?
     private var startedAt: Date?
+    /// Active (moving) time, in whole seconds, not counting pauses — the
+    /// single source of truth for the on-screen timer AND the stored
+    /// `durationSeconds`. `activeTime` keeps the precise sub-second
+    /// accumulation across segments; `elapsedSeconds` is its whole-second view.
+    private var activeTime: TimeInterval = 0
+    private var segmentStart: Date?
+    private var displayTimer: Timer?
+
+    /// Clock seam so tests can drive start/pause/resume/finish
+    /// deterministically without real sleeps.
+    private let currentDate: () -> Date
 
     private static let isoFormatter = ISO8601DateFormatter()
 
-    override init() {
+    init(currentDate: @escaping () -> Date = { Date() }) {
+        self.currentDate = currentDate
         authorizationStatus = CLLocationManager().authorizationStatus
         super.init()
         manager.delegate = self
@@ -48,33 +62,49 @@ final class LocationTracker: NSObject, CLLocationManagerDelegate {
             manager.requestAlwaysAuthorization()
         }
         state = .recording
-        startedAt = Date()
+        startedAt = currentDate()
         trackPoints = []
         routeCoordinates = []
         distanceMeters = 0
         currentSpeedMps = 0
         maxSpeedMps = 0
         elevationGainMeters = 0
+        isGPSDegraded = false
         lastLocation = nil
         lastAltitude = nil
+        activeTime = 0
+        elapsedSeconds = 0
+        segmentStart = currentDate()
+        startDisplayTimer()
         manager.startUpdatingLocation()
     }
 
     func pause() {
         guard state == .recording else { return }
+        if let segmentStart {
+            activeTime += currentDate().timeIntervalSince(segmentStart)
+        }
+        segmentStart = nil
+        elapsedSeconds = Int(activeTime)
         state = .paused
+        stopDisplayTimer()
         manager.stopUpdatingLocation()
     }
 
     func resume() {
         guard state == .paused else { return }
         state = .recording
+        segmentStart = currentDate()
+        startDisplayTimer()
         manager.startUpdatingLocation()
     }
 
     struct Recording {
         let startedAt: Date
         let endedAt: Date
+        /// Active (moving) duration — pause time excluded.
+        let activeDurationSeconds: TimeInterval
+        let durationSeconds: Int
         let trackPoints: [TrackPointPayload]
         let distanceMeters: Double
         let elevationGainMeters: Double
@@ -82,10 +112,18 @@ final class LocationTracker: NSObject, CLLocationManagerDelegate {
     }
 
     func stop() -> Recording {
+        if state == .recording, let segmentStart {
+            activeTime += currentDate().timeIntervalSince(segmentStart)
+        }
+        segmentStart = nil
+        elapsedSeconds = Int(activeTime)
+        stopDisplayTimer()
         manager.stopUpdatingLocation()
         let recording = Recording(
-            startedAt: startedAt ?? Date(),
-            endedAt: Date(),
+            startedAt: startedAt ?? currentDate(),
+            endedAt: currentDate(),
+            activeDurationSeconds: activeTime,
+            durationSeconds: Int(activeTime),
             trackPoints: trackPoints,
             distanceMeters: distanceMeters,
             elevationGainMeters: elevationGainMeters,
@@ -93,7 +131,26 @@ final class LocationTracker: NSObject, CLLocationManagerDelegate {
         )
         state = .idle
         startedAt = nil
+        activeTime = 0
+        elapsedSeconds = 0
         return recording
+    }
+
+    private func startDisplayTimer() {
+        displayTimer?.invalidate()
+        displayTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.tick() }
+        }
+    }
+
+    private func stopDisplayTimer() {
+        displayTimer?.invalidate()
+        displayTimer = nil
+    }
+
+    private func tick() {
+        guard state == .recording, let segmentStart else { return }
+        elapsedSeconds = Int(activeTime + currentDate().timeIntervalSince(segmentStart))
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -110,8 +167,8 @@ final class LocationTracker: NSObject, CLLocationManagerDelegate {
     }
 
     private func record(_ location: CLLocation) {
-        guard state == .recording else { return }
-        guard location.horizontalAccuracy >= 0, location.horizontalAccuracy < 50 else { return }
+        isGPSDegraded = location.horizontalAccuracy < 0 || location.horizontalAccuracy >= 50
+        guard state == .recording, !isGPSDegraded else { return }
 
         if let lastLocation {
             distanceMeters += location.distance(from: lastLocation)

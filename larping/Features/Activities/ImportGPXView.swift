@@ -79,6 +79,9 @@ struct ImportGPXView: View {
             let data = try Data(contentsOf: url)
             fileURL = url
             parsed = try GPXParser.parse(data: data)
+            if let detectedSport = parsed?.sportType {
+                sportType = detectedSport
+            }
         } catch {
             errorMessage = error.localizedDescription
         }

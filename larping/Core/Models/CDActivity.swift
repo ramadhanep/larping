@@ -39,5 +39,19 @@ final class CDActivity {
         return Int(km * hours * 60)
     }
 
+    /// Highest heart rate in any track point (nil when the activity has none —
+    /// live iPhone recordings never populate HR; HealthKit-imported ones do).
+    @Transient
+    var maxHeartRateBpm: Int? {
+        trackPoints.compactMap(\.heartRateBpm).max()
+    }
+
+    @Transient
+    var averageHeartRateBpm: Int? {
+        let rates = trackPoints.compactMap(\.heartRateBpm)
+        guard !rates.isEmpty else { return nil }
+        return rates.reduce(0, +) / rates.count
+    }
+
     init() {}
 }

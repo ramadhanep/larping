@@ -110,3 +110,26 @@ views intentionally leave it as-is. Not a bug, not fixable within the rules.
 foreground (white in light mode on `#463CFF`, black in dark mode on lime) —
 Start, Share. Destructive buttons are red+white natively and must NOT get
 that override. Keep this in mind when adding buttons.
+
+## Heart-rate / cadence fields: live recordings stay nil
+
+`CDTrackPoint.heartRateBpm` / `cadenceRpm` are optional. Live recordings run
+on iPhone GPS only, so they stay `nil` for everything recorded in-app. They
+get populated only via **HealthKit import**: heart-rate samples are matched to
+the imported workout's track points (nearest HR sample at-or-before each
+point's timestamp). Cadence (`cadenceRpm`) remains always-nil — Apple Watch
+exposes *step cadence*, not RPM, and we deliberately don't rename the field or
+map it. Display code hides heart-rate UI when nil — an invisible gap, not a
+bug.
+
+## HealthKit write is best-effort and silent
+
+`HealthKitService.saveWorkout(from:)` guards on availability + authorization
+and swallows errors — a failed/denied write never surfaces UI and never
+blocks the local save. It also uses the iOS-17-deprecated
+`HKWorkout(activityType:start:end:...)` initializer by design (the
+`HKWorkoutBuilder` replacement targets live workout session collection,
+overkill for a post-hoc mirror); expect the deprecation warning in builds.
+The route's reported accuracy is re-claimed at the 50m ceiling the recorder
+accepted, so HealthKit consumers never see accuracy better than what was
+guaranteed.

@@ -22,7 +22,7 @@ final class ActivitiesStore {
         defer { isLoading = false }
         do {
             var descriptor = FetchDescriptor<CDActivity>(sortBy: [SortDescriptor(\.startedAt, order: .reverse)])
-            descriptor.fetchLimit = 50
+            descriptor.fetchLimit = 500
             activities = try modelContext.fetch(descriptor)
         } catch {
             errorMessage = error.localizedDescription

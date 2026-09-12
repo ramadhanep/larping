@@ -7,8 +7,6 @@ struct RecordView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @State private var tracker = LocationTracker()
-    @State private var elapsedSeconds = 0
-    @State private var timer: Timer?
     @State private var selectedSport: SportType = .run
     @State private var eventName = ""
     @State private var eventEdited = false
@@ -62,11 +60,10 @@ struct RecordView: View {
                     .padding(.horizontal, 12)
                     .padding(.bottom, 8)
             }
-            .navigationTitle("Record")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.black.opacity(0.75), for: .navigationBar)
-            .toolbarBackground(colorScheme == .dark ? .visible : .automatic, for: .navigationBar)
-            .toolbarColorScheme(colorScheme == .dark ? .dark : nil, for: .navigationBar)
+            .toolbarBackground(Color.black.opacity(0.75), for: .tabBar)
+            .toolbarBackground(colorScheme == .dark ? .visible : .automatic, for: .tabBar)
+            .toolbarColorScheme(colorScheme == .dark ? .dark : nil, for: .tabBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -137,8 +134,16 @@ struct RecordView: View {
                 HStack(spacing: 8) {
                     Label(selectedSport.label, systemImage: selectedSport.symbolName)
                         .font(.headline)
-                        .foregroundStyle(.accent)
+                        .foregroundStyle(tracker.state == .paused ? AnyShapeStyle(.secondary) : AnyShapeStyle(.accent))
                         .symbolEffect(.bounce, options: .repeating, isActive: tracker.state == .recording)
+                    if tracker.state == .paused {
+                        Text("PAUSED")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.error, in: Capsule())
+                    }
                     Spacer()
                     Text(eventName.isEmpty ? "Larping \(selectedSport.label)" : eventName)
                         .font(.headline)
@@ -149,7 +154,7 @@ struct RecordView: View {
             }
 
             HStack(spacing: 32) {
-                StatColumn(title: "Time", value: Formatters.duration(seconds: elapsedSeconds))
+                StatColumn(title: "Time", value: Formatters.duration(seconds: tracker.elapsedSeconds))
                 StatColumn(title: "Distance", value: Formatters.distance(meters: tracker.distanceMeters))
                 StatColumn(
                     title: selectedSport.usesPaceMetric ? "Pace" : "Speed",
@@ -157,6 +162,15 @@ struct RecordView: View {
                         ? Formatters.paceFromSpeed(metersPerSecond: tracker.currentSpeedMps)
                         : Formatters.speed(metersPerSecond: tracker.currentSpeedMps)
                 )
+            }
+
+            if tracker.state == .recording, tracker.isGPSDegraded {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                    Text("GPS signal weak — recording may be less accurate")
+                }
+                .font(.caption)
+                .foregroundStyle(.warning)
             }
 
             switch tracker.state {
@@ -179,7 +193,6 @@ struct RecordView: View {
                 HStack(spacing: 16) {
                     Button {
                         tracker.pause()
-                        stopTimer()
                     } label: {
                         Label("Pause", systemImage: "pause.fill").frame(maxWidth: .infinity)
                     }
@@ -200,7 +213,6 @@ struct RecordView: View {
                 HStack(spacing: 16) {
                     Button {
                         tracker.resume()
-                        startTimer()
                     } label: {
                         Label("Resume", systemImage: "play.fill").frame(maxWidth: .infinity)
                     }
@@ -235,21 +247,18 @@ struct RecordView: View {
 
     private func startRecording() {
         tracker.start()
-        elapsedSeconds = 0
         cameraPosition = .userLocation(fallback: .automatic)
-        startTimer()
     }
 
     private func finishRecording() {
-        stopTimer()
         let recording = tracker.stop()
         savedDistance = recording.distanceMeters
         let title = eventName.trimmingCharacters(in: .whitespacesAndNewlines)
-        activitiesStore.create(
+        let activity = activitiesStore.create(
             sportType: selectedSport,
             startedAt: recording.startedAt,
             endedAt: recording.endedAt,
-            durationSeconds: Int(recording.endedAt.timeIntervalSince(recording.startedAt)),
+            durationSeconds: recording.durationSeconds > 0 ? recording.durationSeconds : nil,
             distanceMeters: Int(recording.distanceMeters),
             elevationGainMeters: recording.elevationGainMeters > 0 ? Int(recording.elevationGainMeters) : nil,
             averageSpeedMps: averageSpeedMps(recording),
@@ -261,6 +270,7 @@ struct RecordView: View {
         showSavedConfirmation = true
         eventEdited = false
         eventName = suggestedEventName(for: selectedSport)
+        Task { await HealthKitService.saveWorkout(from: activity) }
     }
 
     private func suggestedEventName(for sport: SportType) -> String {
@@ -269,20 +279,9 @@ struct RecordView: View {
     }
 
     private func averageSpeedMps(_ recording: LocationTracker.Recording) -> Double? {
-        let duration = recording.endedAt.timeIntervalSince(recording.startedAt)
-        return duration > 0 ? recording.distanceMeters / duration : nil
-    }
-
-    private func startTimer() {
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            Task { @MainActor in elapsedSeconds += 1 }
-        }
-    }
-
-    private func stopTimer() {
-        timer?.invalidate()
-        timer = nil
+        let duration = recording.activeDurationSeconds
+        guard duration > 0.5 else { return nil }
+        return recording.distanceMeters / duration
     }
 }
 

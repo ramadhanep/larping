@@ -3,7 +3,8 @@ import SwiftUI
 
 struct ActivitiesListView: View {
     @Query(sort: \CDActivity.startedAt, order: .reverse) private var activities: [CDActivity]
-    @State private var showImport = false
+    @State private var showGPXImport = false
+    @State private var showHealthImport = false
 
     private var lastWeek: [CDActivity] {
         let cutoff = Calendar.current.date(byAdding: .day, value: -6, to: Calendar.current.startOfDay(for: Date()))!
@@ -34,15 +35,29 @@ struct ActivitiesListView: View {
                             .foregroundStyle(.primary)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            showImport = true
+                        Menu {
+                            Button {
+                                showGPXImport = true
+                            } label: {
+                                Label("Import GPX", systemImage: "map")
+                            }
+                            if HealthKitService.isAvailable {
+                                Button {
+                                    showHealthImport = true
+                                } label: {
+                                    Label("Import from Health", systemImage: "heart")
+                                }
+                            }
                         } label: {
-                            Label("Import GPX", systemImage: "square.and.arrow.down")
+                            Label("Import", systemImage: "square.and.arrow.down")
                         }
                     }
                 }
-                .sheet(isPresented: $showImport) {
+                .sheet(isPresented: $showGPXImport) {
                     ImportGPXView()
+                }
+                .sheet(isPresented: $showHealthImport) {
+                    ImportHealthKitView()
                 }
         }
     }
