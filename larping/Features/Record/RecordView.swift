@@ -40,7 +40,7 @@ struct RecordView: View {
                         Annotation("", coordinate: tip) {
                             Image(systemName: selectedSport.symbolName)
                                 .font(.subheadline.bold())
-                                .foregroundStyle(.white)
+                                .foregroundStyle(colorScheme == .dark ? .black : .white)
                                 .padding(7)
                                 .background(.accent, in: Circle())
                                 .symbolEffect(.bounce, options: .repeating, isActive: tracker.state == .recording)
@@ -57,13 +57,16 @@ struct RecordView: View {
 
                 controls
                     .padding()
-                    .background(colorScheme == .dark ? AnyShapeStyle(Color.black) : AnyShapeStyle(.thinMaterial))
+                    .background(colorScheme == .dark ? AnyShapeStyle(Color.black.opacity(0.75)) : AnyShapeStyle(.thinMaterial))
                     .clipShape(RoundedRectangle(cornerRadius: 24))
                     .padding(.horizontal, 12)
                     .padding(.bottom, 8)
             }
             .navigationTitle("Record")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.black.opacity(0.75), for: .navigationBar)
+            .toolbarBackground(colorScheme == .dark ? .visible : .automatic, for: .navigationBar)
+            .toolbarColorScheme(colorScheme == .dark ? .dark : nil, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {

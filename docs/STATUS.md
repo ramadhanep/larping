@@ -231,6 +231,57 @@ Root causes worth remembering:
   "Personal bests" section (longest single-activity distance, longest
   single-activity duration).
 
+### Follow-up pass 4 — Record card overlay, classic/map share template cleanup
+
+- **Record bottom card is a translucent overlay, not solid black.** Dark mode
+  background changed to `Color.black.opacity(0.75)` (was fully opaque) so the
+  map shows through faintly while the form stays legible.
+- **Classic share template dropped the event title.** The date moved into
+  the footer at the same size/position the repo URL used to occupy, and the
+  URL text itself was removed. The route's available area grew (504..970 vs
+  580..970) to use the vertical space freed by removing the header's
+  title/date block.
+- **Map share template: icon moved top-left over the map** (mirroring the
+  wordmark's top-right placement) so the info card's title/date can sit flush
+  left instead of indented past an icon. The card's repo-URL footer was
+  removed and its height shrunk from a fixed 580 (leaving empty space below
+  the stats row) to 380, sized to its actual content. Card background alpha
+  dropped 0.72→0.5 (was reading too dark) and corner radius bumped 32→48 to
+  match the Record card's roundedness.
+
+### Follow-up pass 5 — marker consistency, Record nav tint, share template polish
+
+- **Sport marker icon color fixed for dark mode.** The accent background is
+  lime in dark mode, so a white icon on top had poor contrast — icon color is
+  now `colorScheme == .dark ? .black : .white`. Applied to both the live
+  Record marker and Activity Detail's `RouteMap` marker, which also switched
+  its background from a static `.black.opacity(0.6)` to `.accent` to match
+  Record exactly.
+- **Record's nav bar now tints black in dark mode** via
+  `.toolbarBackground(Color.black.opacity(0.75), for: .navigationBar)` +
+  `.toolbarColorScheme(.dark, for: .navigationBar)` (dark mode only) so the
+  liquid-glass bar matches the black card overlay below it instead of
+  rendering a mismatched light glass. Light mode is untouched.
+- **Classic share template: icon/logo proportions reversed.** Icon shrunk
+  230→130pt, wordmark grown 56→110pt (logo is now the dominant element), and
+  header start `cursorY` moved 110→190 for more top clearance when shared to
+  Instagram Story (avoids the profile chip/close button overlay).
+- **Map share template date text matches the classic footer's style** (32pt
+  @0.8 alpha → 30pt @0.72 alpha). The card's separator line was removed
+  entirely (no `drawCardDivider` call left; the now-unused function was
+  deleted) for a cleaner look. The top-right logo and top-left icon both
+  moved down (`y: 90` → `y: 170`) so Instagram Story's own overlay doesn't
+  cover them.
+- **Map share template gets start/finish markers.** `drawRoute(onto
+  snapshot:...)` now draws a small white-outlined badge with a flag glyph at
+  the route's first and last points once the route is fully revealed (static
+  image / finished state only — the video's in-progress leading dot is
+  unchanged).
+- **Apple Maps attribution cannot be hidden.** Apple's MapKit terms require
+  the logo/legal attribution to stay visible on any map view; there is no
+  compliant API to remove it, so this was intentionally left as-is (see
+  `docs/KNOWN_ISSUES.md`).
+
 ## Next / not built
 
 - **Live-record notification** (Dynamic Island / Lock Screen with

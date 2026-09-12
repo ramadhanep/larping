@@ -77,7 +77,7 @@ enum ShareImageComposer {
             drawHeader(stats, canvasWidth: width, soft: softShadow)
             drawRoute(coordinates, canvasWidth: width, revealFraction: routeRevealFraction)
             drawStats(stats, canvasWidth: width, soft: softShadow)
-            drawFooter(canvasWidth: width, soft: softShadow)
+            drawFooter(stats, canvasWidth: width, soft: softShadow)
         }
     }
 
@@ -114,6 +114,7 @@ enum ShareImageComposer {
             }
 
             drawTopRightLogo(canvasWidth: width)
+            drawTopLeftIcon(stats)
             drawInfoCard(stats, canvasWidth: width)
         }
     }
@@ -152,12 +153,13 @@ enum ShareImageComposer {
 
     // MARK: - Classic template drawing
 
-    /// Large sport icon centered at the top, the wordmark right beneath it
-    /// (bigger and more prominent than the old buried footer placement), then
-    /// the event title (as typed by the user, casing preserved) + date.
+    /// Small sport icon at the top with the wordmark (now the more prominent
+    /// element, not the icon) beneath it — no event title/date here (moved to
+    /// the footer). Extra top padding leaves room for Instagram Story's own
+    /// UI (profile chip, close button) when shared there.
     private static func drawHeader(_ stats: Stats, canvasWidth: CGFloat, soft: Bool) {
-        let iconBox: CGFloat = 230
-        var cursorY: CGFloat = 110
+        let iconBox: CGFloat = 130
+        var cursorY: CGFloat = 190
 
         if let glyph = UIImage(systemName: stats.symbolName, withConfiguration: UIImage.SymbolConfiguration(pointSize: iconBox, weight: .bold)) {
             let tinted = glyph.withTintColor(white)
@@ -175,25 +177,18 @@ enum ShareImageComposer {
                 backing.draw(in: rect.offsetBy(dx: 0, dy: 8))
             }
             tinted.draw(in: rect)
-            cursorY = rect.maxY + 20
+            cursorY = rect.maxY + 24
         }
 
         if let logo = UIImage(named: "LogoHorizontal") {
-            let height: CGFloat = 56
+            let height: CGFloat = 110
             let size = CGSize(width: logo.size.width * (height / logo.size.height), height: height)
             let rect = CGRect(x: (canvasWidth - size.width) / 2, y: cursorY, width: size.width, height: size.height)
             if soft {
                 logo.withTintColor(UIColor.black.withAlphaComponent(0.8), renderingMode: .alwaysTemplate).draw(in: rect.offsetBy(dx: 0, dy: 6))
             }
             logo.withTintColor(white.withAlphaComponent(0.92), renderingMode: .alwaysTemplate).draw(in: rect)
-            cursorY = rect.maxY + 28
         }
-
-        let title = NSAttributedString(string: displayTitle(stats), attributes: textAttributes(white, size: 54, weight: .heavy, soft: soft))
-        let date = NSAttributedString(string: stats.date, attributes: textAttributes(white.withAlphaComponent(0.78), size: 40, weight: .semibold, soft: soft))
-
-        drawCentered(title, atY: cursorY, canvasWidth: canvasWidth)
-        drawCentered(date, atY: cursorY + title.size().height + 12, canvasWidth: canvasWidth)
     }
 
     /// Draws the recorded route as a stroked accent-color line, scaled to fit a
@@ -203,7 +198,7 @@ enum ShareImageComposer {
     /// `revealFraction` (0...1) draws only the leading portion in recorded point
     /// order, for the animated video export… and the classic template's route
     /// (pass 1 at rest). No endpoint markers when fully revealed.
-    private static func drawRoute(_ coordinates: [CLLocationCoordinate2D], canvasWidth: CGFloat, availableRect: CGRect = CGRect(x: 54, y: 580, width: 972, height: 390), revealFraction: Double = 1) {
+    private static func drawRoute(_ coordinates: [CLLocationCoordinate2D], canvasWidth: CGFloat, availableRect: CGRect = CGRect(x: 54, y: 504, width: 972, height: 466), revealFraction: Double = 1) {
         guard coordinates.count > 1 else { return }
 
         let lats = coordinates.map(\.latitude)
@@ -277,12 +272,12 @@ enum ShareImageComposer {
         }
     }
 
-    /// Repo URL, raised above Instagram Story's reply input area. The wordmark
-    /// itself now sits up top under the sport icon (see `drawHeader`) instead
-    /// of being buried down here.
-    private static func drawFooter(canvasWidth: CGFloat, soft: Bool) {
-        let repo = NSAttributedString(string: "github.com/ramadhanep/larping", attributes: textAttributes(white.withAlphaComponent(0.72), size: 30, weight: .semibold, soft: soft))
-        drawCentered(repo, atY: 1610, canvasWidth: canvasWidth)
+    /// Date, raised above Instagram Story's reply input area — replaces the
+    /// repo URL that used to live here (removed; the wordmark up top under
+    /// the sport icon is branding enough).
+    private static func drawFooter(_ stats: Stats, canvasWidth: CGFloat, soft: Bool) {
+        let date = NSAttributedString(string: stats.date, attributes: textAttributes(white.withAlphaComponent(0.72), size: 30, weight: .semibold, soft: soft))
+        drawCentered(date, atY: 1610, canvasWidth: canvasWidth)
     }
 
     // MARK: - Map card drawing
@@ -293,10 +288,20 @@ enum ShareImageComposer {
         guard let logo = UIImage(named: "LogoHorizontal") else { return }
         let height: CGFloat = 52
         let size = CGSize(width: logo.size.width * (height / logo.size.height), height: height)
-        let rect = CGRect(x: canvasWidth - size.width - 54, y: 90, width: size.width, height: size.height)
+        let rect = CGRect(x: canvasWidth - size.width - 54, y: 170, width: size.width, height: size.height)
         logo.withTintColor(UIColor.black.withAlphaComponent(0.75), renderingMode: .alwaysTemplate)
             .draw(in: rect.offsetBy(dx: 0, dy: 5))
         logo.withTintColor(white.withAlphaComponent(0.95), renderingMode: .alwaysTemplate).draw(in: rect)
+    }
+
+    /// Sport icon floated top-left over the map, mirroring the wordmark's
+    /// top-right placement — keeps the info card's title/date flush left
+    /// instead of indented past an icon.
+    private static func drawTopLeftIcon(_ stats: Stats) {
+        guard let glyph = UIImage(systemName: stats.symbolName, withConfiguration: UIImage.SymbolConfiguration(pointSize: 44, weight: .bold)) else { return }
+        let rect = CGRect(x: 54, y: 170, width: glyph.size.width, height: glyph.size.height)
+        glyph.withTintColor(UIColor.black.withAlphaComponent(0.75)).draw(in: rect.offsetBy(dx: 0, dy: 5))
+        glyph.withTintColor(white).draw(in: rect)
     }
 
     private static func drawScrim(in bounds: CGRect, using cgContext: CGContext) {
@@ -340,36 +345,45 @@ enum ShareImageComposer {
             outline.lineWidth = 4
             white.setStroke()
             outline.stroke()
+        } else if routeRevealFraction >= 1 {
+            drawRouteEndpoint(at: points[0], symbolName: "flag.circle.fill")
+            drawRouteEndpoint(at: points[points.count - 1], symbolName: "checkered.flag")
         }
     }
 
-    /// Bottom card over the map: sport icon + event title + date, the three
-    /// stats, and the wordmark + repo URL — everything a share needs, in one
-    /// always-readable panel.
+    /// Small labeled flag badge for the route's start/finish points on the
+    /// finished map card — only shown once the route is fully drawn in.
+    private static func drawRouteEndpoint(at point: CGPoint, symbolName: String) {
+        guard let glyph = UIImage(systemName: symbolName, withConfiguration: UIImage.SymbolConfiguration(pointSize: 20, weight: .bold)) else { return }
+        let badgeRadius: CGFloat = 22
+        let badgeRect = CGRect(x: point.x - badgeRadius, y: point.y - badgeRadius, width: badgeRadius * 2, height: badgeRadius * 2)
+        white.setFill()
+        UIBezierPath(ovalIn: badgeRect).fill()
+        let outline = UIBezierPath(ovalIn: badgeRect)
+        outline.lineWidth = 3
+        routeColor.setStroke()
+        outline.stroke()
+        let tinted = glyph.withTintColor(spaceBlack)
+        let iconRect = CGRect(x: point.x - tinted.size.width / 2, y: point.y - tinted.size.height / 2, width: tinted.size.width, height: tinted.size.height)
+        tinted.draw(in: iconRect)
+    }
+
+    /// Bottom card over the map: event title + date and the three stats — no
+    /// icon (moved top-left over the map) or repo URL, and sized to its own
+    /// content instead of leaving empty space below.
     private static func drawInfoCard(_ stats: Stats, canvasWidth: CGFloat) {
-        let card = CGRect(x: 54, y: 1180, width: canvasWidth - 108, height: 580)
-        UIColor.black.withAlphaComponent(0.72).setFill()
-        UIBezierPath(roundedRect: card, cornerRadius: 32)
+        let card = CGRect(x: 54, y: 1180, width: canvasWidth - 108, height: 380)
+        UIColor.black.withAlphaComponent(0.5).setFill()
+        UIBezierPath(roundedRect: card, cornerRadius: 48)
             .fill()
 
-        // Icon left of the title.
-        var iconGap: CGFloat = 0
-        if let glyph = UIImage(systemName: stats.symbolName, withConfiguration: UIImage.SymbolConfiguration(pointSize: 48, weight: .bold)) {
-            let tinted = glyph.withTintColor(white)
-            tinted.draw(at: CGPoint(x: card.minX + 44, y: card.minY + 46))
-            iconGap = tinted.size.width + 26
-        }
-
         let title = NSAttributedString(string: displayTitle(stats), attributes: textAttributes(white, size: 56, weight: .heavy, soft: false))
-        let date = NSAttributedString(string: stats.date, attributes: textAttributes(white.withAlphaComponent(0.8), size: 32, weight: .semibold, soft: false))
-        let textX = card.minX + 44 + iconGap
+        let date = NSAttributedString(string: stats.date, attributes: textAttributes(white.withAlphaComponent(0.72), size: 30, weight: .semibold, soft: false))
+        let textX = card.minX + 44
         var y: CGFloat = card.minY + 44
         title.draw(at: CGPoint(x: textX, y: y))
         y += title.size().height + 10
         date.draw(at: CGPoint(x: textX, y: y))
-
-        // Divider.
-        drawCardDivider(x0: card.minX + 44, x1: card.maxX - 44, y: card.minY + 184)
 
         // Three stats across one row.
         let rows: [(String, String)] = [
@@ -383,22 +397,6 @@ enum ShareImageComposer {
             drawCentered(NSAttributedString(string: row.0, attributes: textAttributes(white.withAlphaComponent(0.6), size: 24, weight: .medium, soft: false)), atY: card.minY + 224, centerX: centerX)
             drawCentered(NSAttributedString(string: row.1, attributes: valueAttributes(50, soft: false)), atY: card.minY + 260, centerX: centerX)
         }
-
-        // Divider.
-        drawCardDivider(x0: card.minX + 44, x1: card.maxX - 44, y: card.minY + 348)
-
-        // Footer: repo URL (the wordmark itself now floats top-right over the map).
-        let url = NSAttributedString(string: "github.com/ramadhanep/larping", attributes: textAttributes(white.withAlphaComponent(0.72), size: 26, weight: .semibold, soft: false))
-        url.draw(at: CGPoint(x: card.minX + 44, y: card.minY + 384))
-    }
-
-    private static func drawCardDivider(x0: CGFloat, x1: CGFloat, y: CGFloat) {
-        UIColor.white.withAlphaComponent(0.25).setStroke()
-        let divider = UIBezierPath()
-        divider.move(to: CGPoint(x: x0, y: y))
-        divider.addLine(to: CGPoint(x: x1, y: y))
-        divider.lineWidth = 2
-        divider.stroke()
     }
 
     // MARK: - Helpers

@@ -69,7 +69,7 @@ struct ProfileView: View {
                             .scaledToFit()
                             .frame(height: 14)
                             .foregroundStyle(.white)
-                            .padding(10)
+                            .padding(15)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     }
                     .frame(height: 170)

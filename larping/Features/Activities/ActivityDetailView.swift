@@ -136,6 +136,7 @@ private struct RouteMap: View {
     let coordinates: [CLLocationCoordinate2D]
     let sportType: SportType
 
+    @Environment(\.colorScheme) private var colorScheme
     private static let drawDuration: TimeInterval = 5.5
 
     @State private var startDate = Date()
@@ -174,9 +175,9 @@ private struct RouteMap: View {
                 Annotation("", coordinate: coordinates[revealedCount - 1]) {
                     Image(systemName: sportType.symbolName)
                         .font(.subheadline.bold())
-                        .foregroundStyle(.white)
+                        .foregroundStyle(colorScheme == .dark ? .black : .white)
                         .padding(7)
-                        .background(.black.opacity(0.6), in: Circle())
+                        .background(.accent, in: Circle())
                         .symbolEffect(.bounce, options: .repeating, isActive: !isDrawComplete)
                 }
             }

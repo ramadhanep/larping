@@ -138,9 +138,11 @@ trimmed-empty disables Start (with an inline hint) rather than silently
 falling back at save time. The bottom control card is fully rounded
 (`RoundedRectangle`, all corners) with horizontal/bottom margins so it floats
 above the map instead of spanning edge-to-edge — matching the already-
-transparent nav bar's floating look — and is solid black in dark mode (was
-`.thinMaterial`, which read as translucent gray over the map; light mode
-keeps `.thinMaterial`). On **Finish** it calls
+transparent nav bar's floating look — and in dark mode is `Color.black.
+opacity(0.75)` (was solid opaque black, then `.thinMaterial` before that,
+which read as translucent gray over the map) — opaque enough to keep the
+form legible, translucent enough that the map still shows through faintly;
+light mode keeps `.thinMaterial`. On **Finish** it calls
 `tracker.stop()`, then `ActivitiesStore.create(...)` **immediately** (auto-
 save — no form, no discard path), storing the event name (auto name when left
 blank), and shows a "saved" alert. The recording header is a row — sport
@@ -153,8 +155,17 @@ bar). GPX import takes the same `create(...)` path from `GPXParser.Result`.
 `UserAnnotation()` blue dot is swapped for an `Annotation` at
 `tracker.routeCoordinates.last` showing the selected sport's icon in an
 accent-filled circle, bouncing while actively recording (paused stops the
-bounce) — same visual language as the detail-view rider. Falls back to
-`UserAnnotation()` before a route exists.
+bounce) — same visual language as the detail-view rider. Icon color is
+`colorScheme`-dependent (black in dark mode, white in light mode) since the
+accent fill is lime in dark mode — a white icon there had poor contrast.
+Falls back to `UserAnnotation()` before a route exists.
+
+**Nav bar tint**: in dark mode only, Record's nav bar gets
+`.toolbarBackground(Color.black.opacity(0.75), for: .navigationBar)` +
+`.toolbarColorScheme(.dark, for: .navigationBar)` so the liquid-glass bar
+matches the black bottom card instead of rendering a mismatched light glass
+over it. Light mode is untouched (default automatic glass, matching the
+card's `.thinMaterial`).
 
 **History heatmap**: the Record map draws every past activity's route
 (`activitiesStore.activities`, capped at 50 by `ActivitiesStore.refresh`) as
@@ -169,7 +180,9 @@ polyline progressively over ~5.5s using `TimelineView(.animation(paused:))`
 — it slices `coordinates.prefix(revealedCount)` by elapsed-time fraction, so
 it follows recorded point order (works for loops/backtracks, not just
 point-to-point). A sport-specific icon marker (the activity's `symbolName`
-in a dark circle, gently bouncing while drawing) rides at the current tip
+in an accent-filled circle, `colorScheme`-dependent icon color, gently
+bouncing while drawing — same styling as Record's live rider marker) rides
+at the current tip
 (`coordinates[revealedCount - 1]`), settling at the finish when the draw
 completes. Paused after the draw completes so the timeline stops ticking.
 `TimelineView` uses `.animation(minimumInterval: 1.0/12.0, paused:)` instead
@@ -196,24 +209,27 @@ Canvas 1080x1920.
    PNG the user can paste onto anything (`ShareLink` shares a PNG). White
    foreground gets dark drop shadows only in the transparent mode so it stays
    legible over light pastes.
-2. Big centered sport icon (box ~230pt, aspect-preserved) at top, with an
+2. Small centered sport icon (box ~130pt, aspect-preserved) at top (starts
+   at y≈190, extra top clearance for Instagram Story's own UI), with an
    offset dark backing when transparent.
-3. `LogoHorizontal` wordmark (56pt tall, white 92%) centered right beneath
-   the icon — deliberately prominent, not buried in the footer.
-4. Centered **event title as typed by the user** (54 heavy, casing preserved;
-   falls back to "Larping <Sport>" when nil) + date (40 semibold, 78% white).
-5. Route: accent-color polyline (16pt, round joins) — `Accent` asset color
+3. `LogoHorizontal` wordmark (110pt tall, white 92%) centered right beneath
+   the icon — now the dominant element (was smaller than the icon before;
+   flipped so the brand mark reads first). No event title/date in the header
+   anymore (moved to the footer, see below) — this template no longer names
+   the event at all, just icon + brand mark.
+4. Route: accent-color polyline (16pt, round joins) — `Accent` asset color
    resolved at draw time, so it follows system light/dark mode (lime dark,
    `#463CFF` light). Fits into an aspect-matched, centered region
-   (y≈580..970) → symmetric margins for any route size.
-6. Stats: one centered column, 3 rows (DISTANCE / DURATION / PACE).
-7. Footer: just the repo URL, centered at y≈1610 (the wordmark moved up under
-   the icon).
+   (y≈504..970) → symmetric margins for any route size.
+5. Stats: one centered column, 3 rows (DISTANCE / DURATION / PACE).
+6. Footer: the activity **date** (30 semibold, 72% white) — replaces the old
+   repo URL text at the same position/size (y≈1610); the URL itself was
+   dropped.
 
-`drawHeader` lays out icon → logo → title → date with a running `cursorY`
-(each element's `rect.maxY` + a fixed gap feeds the next), not hardcoded
-absolute y's for every element — keeps the block self-consistent if any one
-piece's rendered height varies.
+`drawHeader` lays out icon → logo with a running `cursorY` (each element's
+`rect.maxY` + a fixed gap feeds the next), not hardcoded absolute y's for
+every element — keeps the block self-consistent if any one piece's rendered
+height varies.
 
 ## Map template (`ShareImageComposer.composeMapCard(snapshot:coordinates:stats:routeRevealFraction:)`)
 
@@ -223,13 +239,24 @@ bounding box fills the whole background (dimmed + a bottom gradient scrim),
 with the route redrawn on top using the snapshot's `point(for:)` conversion
 (exact, because the snapshot is requested at canvas size → 1:1 mapping). The
 `LogoHorizontal` wordmark floats **top-right over the map itself** (52pt,
-dark backing so it stays legible over unpredictable map colors) — kept
-outside the card so it reads as a mark on the photo, not card content. A
-semi-transparent **bottom card** (y≈1180..1760) holds everything else:
-sport icon + event title + date, three stats, and the repo URL. No snapshot
-available (offline) → falls back to space-black background + the same card
-(+ top-right wordmark). `routeRevealFraction` (0...1) draws only the leading
-portion of the route with a dot at the tip, used by video frames.
+dark backing so it stays legible over unpredictable map colors, y≈170); the
+sport icon mirrors it **top-left** (44pt, same dark backing, y≈170) — both
+live outside the card so it reads as marks on the photo, not card content,
+and so the card's title/date can start flush left instead of being indented
+past an icon. Both sit lower than a naive top corner (y≈170, not 90) so
+Instagram Story's own profile-chip/close-button overlay doesn't cover them.
+The **bottom card** (y≈1180..1560, sized to its content instead of a fixed
+oversized box that left empty space) holds event title + date and the three
+stats — no icon, no repo URL, no separator line (removed for a cleaner
+look; date text shrunk to 30pt/72% white to match the classic template's
+footer date). Card background dropped from 72% to 50% black opacity (was
+reading too dark/opaque) and corner radius bumped 32→48 to match the
+roundedness of the Record bottom card. No snapshot available (offline) →
+falls back to space-black background + the same card (+ top-left icon,
+top-right wordmark). `routeRevealFraction` (0...1) draws only the leading
+portion of the route with a dot at the tip, used by video frames; once fully
+revealed (static image), small flag badges mark the route's start and
+finish points instead.
 
 ## Video template (`ShareVideoComposer.composeVideo(snapshot:coordinates:stats:)`)
 

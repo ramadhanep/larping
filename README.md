@@ -26,7 +26,8 @@ source.
   route tip on the map (falls back to the system blue dot before you start).
   Location button lives in the nav bar (top-trailing); the map is full-bleed,
   the bottom control card is fully rounded with side/bottom margins so it
-  floats above the map, and goes solid black in dark mode.
+  floats above the map, and is a translucent black overlay in dark mode (form
+  content stays legible, map shows through faintly).
 - **Activities** — list header is the horizontal wordmark (no title text, no
   separate leading toolbar icon — avoids the "glass" chip iOS puts behind
   bare toolbar images); auto-refreshes via `@Query`. A "This week"
@@ -37,17 +38,18 @@ source.
   title + sport icon overlaid bottom-left/bottom-right), bold stat tiles, and
   an overflow (`•••`) menu for Share / **Rename event** / Delete.
 - **Share** — three swipeable 1080x1920 (Instagram Story ratio) templates:
-  a classic card (sport icon + wordmark up top, route path line + stats,
-  over a photo or a **transparent PNG** you can paste anywhere — previewed on
-  a black backing so it stays visible in light mode, exported/shared fully
-  transparent), a map template (real map fills the background with the
-  wordmark floated top-right over it, route overlaid, everything else — icon,
-  title, stats, repo URL — inside a bottom info card), and a slow 60fps
-  animated video of the route drawing in over the same map. The card title is
-  the event name exactly as typed (casing preserved). Pace is shown without
-  the ` /km` unit; speed sports keep `km/h`. Generated videos are temporary —
-  share/save them before leaving, then they're cleaned up. Shared via the
-  system share sheet.
+  a classic card (sport icon + wordmark up top, a big route path line +
+  stats, and the date in the footer — no event title, over a photo or a
+  **transparent PNG** you can paste anywhere — previewed on a black backing
+  so it stays visible in light mode, exported/shared fully transparent), a
+  map template (real map fills the background with the wordmark top-right
+  and the sport icon top-left over it, route overlaid with start/finish flag
+  markers, and a bottom info card — sized to its content, no repo URL — holding
+  the event title, date, and stats), and a slow 60fps animated video of the
+  route drawing in over the same map. The map template's card title is the event name exactly as
+  typed (casing preserved). Pace is shown without the ` /km` unit; speed
+  sports keep `km/h`. Generated videos are temporary — share/save them before
+  leaving, then they're cleaned up. Shared via the system share sheet.
 - **GPX import** — `.gpx` file → activity (`source: gpx_import`).
 - **Stats** — last-7-days distance chart + per-sport totals (distance, time,
   activity count), plus all-time totals and personal bests (longest distance,

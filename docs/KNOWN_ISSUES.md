@@ -96,6 +96,14 @@ into the app bundle (hit with Domine). A future custom font would need either
 a real `Copy Bundle Resources` entry plus an exception, or in-memory embed.
 Don't drop a font into `larping/` and assume it ships.
 
+## Apple Maps attribution/logo cannot be hidden
+
+MapKit's terms of service require the Apple logo and legal attribution
+overlay to remain visible on any map view — there's no public, compliant API
+to remove or hide it. Clipping/cropping it out would violate Apple's usage
+terms and risks App Store rejection, so Record and Activity Detail's map
+views intentionally leave it as-is. Not a bug, not fixable within the rules.
+
 ## Prominent-button text contrast is hand-managed
 
 `.borderedProminent` labels on the accent color need a `colorScheme`-based
