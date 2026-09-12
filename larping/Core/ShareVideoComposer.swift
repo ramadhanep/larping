@@ -1,12 +1,13 @@
 import AVFoundation
 import CoreLocation
+import MapKit
 import UIKit
 
-/// Renders the route draw-in as an actual video file: reuses
-/// `ShareImageComposer.compose(...routeRevealFraction:)` frame-by-frame (same
-/// plain space-dark background + accent route line as the default template,
-/// not a live map — snapshotting map tiles per frame would mean hundreds of
-/// network fetches for one export) and encodes with `AVAssetWriter`.
+/// Renders the route draw-in as an actual video file over the map background
+/// (same visual language as the map image template): one real MapKit snapshot
+/// fetched once, then `composeMapCard(...routeRevealFraction:)` drawn per frame
+/// so the route reveals over the map without thousands of per-frame tile
+/// fetches. Output goes to a temporary file and is never persisted.
 enum ShareVideoComposer {
     static let duration: TimeInterval = 6
     static let frameRate: Int32 = 60
@@ -15,7 +16,7 @@ enum ShareVideoComposer {
         case writerFailed
     }
 
-    static func composeVideo(coordinates: [CLLocationCoordinate2D], stats: ShareImageComposer.Stats) async throws -> URL {
+    static func composeVideo(snapshot: MKMapSnapshotter.Snapshot?, coordinates: [CLLocationCoordinate2D], stats: ShareImageComposer.Stats) async throws -> URL {
         let size = ShareImageComposer.canvasSize
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("larping-share-\(UUID().uuidString).mp4")
 
@@ -45,7 +46,12 @@ enum ShareVideoComposer {
                 try await Task.sleep(for: .milliseconds(2))
             }
             let progress = Double(frame) / Double(totalFrames - 1)
-            let image = ShareImageComposer.compose(photo: nil, coordinates: coordinates, stats: stats, routeRevealFraction: progress)
+            let image = ShareImageComposer.composeMapCard(
+                snapshot: snapshot,
+                coordinates: coordinates,
+                stats: stats,
+                routeRevealFraction: progress
+            )
             guard let buffer = pixelBuffer(from: image, size: size) else { continue }
             adaptor.append(buffer, withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: frameRate))
         }

@@ -26,6 +26,7 @@ enum BackupService {
                 averageSpeedMps: activity.averageSpeedMps,
                 maxSpeedMps: activity.maxSpeedMps,
                 source: activity.source,
+                eventName: activity.eventName,
                 createdAt: activity.createdAt,
                 trackPoints: activity.trackPoints
                     .sorted { $0.timestamp < $1.timestamp }
@@ -86,6 +87,7 @@ enum BackupService {
             activity.averageSpeedMps = backup.averageSpeedMps
             activity.maxSpeedMps = backup.maxSpeedMps
             activity.source = backup.source
+            activity.eventName = backup.eventName
             activity.createdAt = backup.createdAt
 
             let points = backup.trackPoints.map { backupPoint in
@@ -140,6 +142,7 @@ struct BackupActivity: Codable {
     let averageSpeedMps: Double?
     let maxSpeedMps: Double?
     let source: String
+    let eventName: String?
     let createdAt: Date
     let trackPoints: [BackupTrackPoint]
 }

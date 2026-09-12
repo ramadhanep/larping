@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct ProfileView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(ActivitiesStore.self) private var activitiesStore
+    @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appearanceMode") private var appearanceMode = AppearanceMode.system
     @AppStorage("displayName") private var displayName = "Larping User"
     @AppStorage("bio") private var bio = "Chasing routes, one recording at a time."
@@ -20,35 +21,61 @@ struct ProfileView: View {
         NavigationStack {
             List {
                 Section {
-                    ZStack {
-                        Color.accentColor
+                    ZStack(alignment: .bottomLeading) {
+                        LinearGradient(
+                            colors: [Color.accentColor, .black],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+
+                        // Readability scrim: darkens the whole cover (not just
+                        // the bottom) so a bright accent-gradient fallback never
+                        // reads as raw lime/blue, while staying darkest at the
+                        // bottom for the info block.
+                        LinearGradient(
+                            colors: [.black.opacity(0.32), .black.opacity(0.45), .black.opacity(0.8)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+
+                        VStack(spacing: 6) {
+                            Spacer(minLength: 0)
+
+                            Image(systemName: "figure.run.circle.fill")
+                                .font(.system(size: 46))
+                                .foregroundStyle(.white)
+                            Text(displayName)
+                                .font(.headline.bold())
+                                .foregroundStyle(.white)
+                            if !bio.isEmpty {
+                                Text(bio)
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.9))
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(1)
+                            }
+
+                            Spacer(minLength: 0)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.horizontal, 14)
+                        .padding(.top, 14)
+
                         Image("LogoHorizontal")
                             .renderingMode(.template)
                             .resizable()
                             .scaledToFit()
-                            .frame(height: 32)
+                            .frame(height: 14)
                             .foregroundStyle(.white)
+                            .padding(10)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     }
-                    .frame(height: 140)
+                    .frame(height: 170)
                     .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
                     .listRowInsets(EdgeInsets())
-                    .padding(.horizontal)
-                    .listRowBackground(Color.clear)
-                }
-
-                Section {
-                    VStack(spacing: 8) {
-                        Image(systemName: "figure.run.circle.fill")
-                            .font(.system(size: 64))
-                            .foregroundStyle(.tint)
-                        Text(displayName).font(.title2.bold())
-                        if !bio.isEmpty {
-                            Text(bio).font(.footnote).multilineTextAlignment(.center)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
                     .listRowBackground(Color.clear)
                 }
 
@@ -59,12 +86,36 @@ struct ProfileView: View {
                 }
 
                 Section("Appearance") {
-                    Picker("Theme", selection: $appearanceMode) {
+                    HStack(spacing: 6) {
                         ForEach(AppearanceMode.allCases) { mode in
-                            Text(mode.label).tag(mode)
+                            let isSelected = appearanceMode == mode
+                            Button {
+                                appearanceMode = mode
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Image(systemName: mode.symbolName)
+                                        .font(.system(size: 13, weight: .semibold))
+                                    Text(mode.label)
+                                        .font(.footnote.weight(.medium))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(
+                                    isSelected ? Color.accentColor : Color.clear,
+                                    in: RoundedRectangle(cornerRadius: 8)
+                                )
+                                .foregroundStyle(
+                                    isSelected
+                                        ? (colorScheme == .dark ? Color.black : Color.white)
+                                        : Color.secondary
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                    .pickerStyle(.segmented)
+                    .padding(4)
+                    .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))
+                    .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
                 }
 
                 Section("Backup") {
@@ -83,11 +134,13 @@ struct ProfileView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Section("About") {
-                    Label("Larping", systemImage: "figure.run")
-                    Label("actually works", systemImage: "bolt.fill")
+                Section {
+                    Text("Larping v\(appVersion) (\(appBuild))")
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
                 }
+                .listRowBackground(Color.clear)
             }
             .navigationTitle("Profile")
             .sheet(isPresented: $showEdit) {
@@ -141,6 +194,14 @@ struct ProfileView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         return "larping-backup-\(formatter.string(from: Date()))"
+    }
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+
+    private var appBuild: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
     }
 
     private func exportBackup() {

@@ -27,10 +27,12 @@ activities — deleting everything yourself never brings them back (by design).
 
 ## SwiftData schema changes = uninstall to reinstall
 
-The store schema changed several times during the offline-first rewrite. An
-app built before a schema change can hit a migration error on launch. When
-testing across refactors: uninstall first, or `rm -rf
-~/Library/Developer/Xcode/DerivedData/larping-*` and reinstall.
+The store schema changed several times during development. Adding a new
+**optional** model property (like `CDActivity.eventName`) is a lightweight
+migration SwiftData applies automatically on launch and normally needs no
+reinstall. But a failing/missing auto-migration still reads as a crash on
+launch. When testing across schema-affecting changes: uninstall first, or
+`rm -rf ~/Library/Developer/Xcode/DerivedData/larping-*` and reinstall.
 
 ## Route map in detail needs a network
 
@@ -70,13 +72,22 @@ A default `MapUserLocationButton` was duplicating the custom toolbar button;
 the default one was removed. Re-add the default (`mapControls`) and you'll
 see the double again.
 
-## Share card is always space-dark
+## Share: plain classic card is a transparent PNG; map cards are opaque
 
-The exported share image uses a space-black background with full-white text
-regardless of the app's light/dark theme — intentional (Grok-style export).
-The route line is the one exception: it uses the adaptive `Accent` color, so
-it's lime or `#463CFF` depending on system appearance even though the
-background never changes. Not a bug.
+The classic template with **no photo** exports a transparent-background PNG
+(white content with dark shadows) so it can be pasted on any backdrop. With a
+photo, the card is photo + black dim, fully opaque. The map template + video
+have their own opaque map background. So "the share image is always space
+dark" is no longer true — only the map fallback (no network tiles) and the
+photo-less classic video-era path use `spaceBlack`. Not a bug.
+
+The **preview thumbnail** for that transparent card sits on a black backing
+in `ShareActivityView` (`classicPreview`) purely so the white content is
+visible in light mode — that backing is UI chrome only, not part of the
+composed image. If the exported/shared/saved file ever looks like it has a
+black background, that's a real regression (check `ShareImageComposer.compose`
+still leaves the canvas untouched when `photo == nil`); the on-screen preview
+having one is expected.
 
 ## Bundling fonts via the synchronized group silently fails
 

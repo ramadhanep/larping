@@ -36,6 +36,23 @@ nonisolated enum SportType: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Builds the default event title for an activity: "Larping Run", bumped to
+/// "Larping Run 1" / "Larping Run 2" / … as soon as a name already exists, so
+/// recording the same sport repeatedly never produces duplicates.
+nonisolated enum EventNamer {
+    static func nextName(base: String, existing: [String]) -> String {
+        var maxSuffix = -1
+        if existing.contains(base) { maxSuffix = 0 }
+        let prefix = base + " "
+        for name in existing where name.hasPrefix(prefix) {
+            if let n = Int(name.dropFirst(prefix.count)) {
+                maxSuffix = max(maxSuffix, n)
+            }
+        }
+        return maxSuffix < 0 ? base : "\(base) \(maxSuffix + 1)"
+    }
+}
+
 /// In-memory transfer shape produced by the live recorder and GPX import and
 /// consumed by `ActivitiesStore` when materializing SwiftData track points.
 nonisolated struct TrackPointPayload: Codable {

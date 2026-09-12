@@ -40,6 +40,7 @@ final class ActivitiesStore {
         averageSpeedMps: Double?,
         maxSpeedMps: Double?,
         source: String?,
+        eventName: String? = nil,
         trackPointsPayloads: [TrackPointPayload]
     ) -> CDActivity {
         let activity = CDActivity()
@@ -52,6 +53,7 @@ final class ActivitiesStore {
         activity.averageSpeedMps = averageSpeedMps
         activity.maxSpeedMps = maxSpeedMps
         activity.source = source ?? "mobile"
+        activity.eventName = eventName
 
         let points: [CDTrackPoint] = trackPointsPayloads.map { payload in
             let point = CDTrackPoint()
@@ -71,6 +73,12 @@ final class ActivitiesStore {
         try? modelContext.save()
         activities.insert(activity, at: 0)
         return activity
+    }
+
+    func rename(_ activity: CDActivity, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        activity.eventName = trimmed.isEmpty ? nil : trimmed
+        try? modelContext.save()
     }
 
     func delete(_ activity: CDActivity) {

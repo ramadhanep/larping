@@ -13,6 +13,7 @@ final class CDActivity {
     var averageSpeedMps: Double?
     var maxSpeedMps: Double?
     var source: String = "mobile"
+    var eventName: String?
     var createdAt: Date = Date()
 
     @Relationship(deleteRule: .cascade, inverse: \CDTrackPoint.activity)

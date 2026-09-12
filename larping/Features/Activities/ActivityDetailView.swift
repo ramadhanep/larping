@@ -7,7 +7,14 @@ struct ActivityDetailView: View {
     @Environment(ActivitiesStore.self) private var store
     @State private var showDeleteConfirmation = false
     @State private var showShareSheet = false
+    @State private var showRename = false
+    @State private var renameText = ""
     @Environment(\.dismiss) private var dismiss
+
+    private var title: String {
+        let trimmed = activity.eventName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? activity.sportType.label : trimmed
+    }
 
     private var coordinates: [CLLocationCoordinate2D] {
         store.coordinates(for: activity)
@@ -17,19 +24,39 @@ struct ActivityDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 if coordinates.count > 1 {
-                    RouteMap(coordinates: coordinates)
-                        .frame(height: 260)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                }
+                    ZStack(alignment: .bottomLeading) {
+                        RouteMap(coordinates: coordinates, sportType: activity.sportType)
+                            .frame(height: 380)
 
-                HStack {
-                    Label(activity.sportType.label, systemImage: activity.sportType.symbolName)
-                        .font(.title2.bold())
-                    Spacer()
-                }
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.65)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
 
-                Text(Formatters.displayDate(date: activity.startedAt))
-                    .foregroundStyle(.secondary)
+                        HStack(alignment: .bottom) {
+                            Image(systemName: activity.sportType.symbolName)
+                                .font(.title2.bold())
+                                .foregroundStyle(.white)
+                                .padding(10)
+                                .background(.black.opacity(0.35), in: Circle())
+
+                            Spacer()
+
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text(title)
+                                    .font(.title3.bold())
+                                    .foregroundStyle(.white)
+                                    .multilineTextAlignment(.trailing)
+                                Text(Formatters.displayDate(date: activity.startedAt))
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.85))
+                            }
+                        }
+                        .padding(16)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                }
 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                     StatTile(title: "Distance", value: Formatters.distance(meters: activity.distanceMeters.map(Double.init)))
@@ -57,45 +84,57 @@ struct ActivityDetailView: View {
                         StatTile(title: "Calories", value: "\(calories) kcal")
                     }
                 }
-
-                HStack {
-                    Spacer()
-                    Button(role: .destructive) {
-                        showDeleteConfirmation = true
-                    } label: {
-                        Label("Delete activity", systemImage: "trash")
-                            .font(.subheadline)
-                    }
-                    .padding(.top, 16)
-                }
             }
             .padding()
         }
         .navigationTitle("Activity")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if coordinates.count > 1 {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showShareSheet = true
-                    } label: {
-                        Label("Share", systemImage: "square.and.arrow.up")
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    if coordinates.count > 1 {
+                        Button {
+                            showShareSheet = true
+                        } label: {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                        }
                     }
+                    Button {
+                        renameText = title
+                        showRename = true
+                    } label: {
+                        Label("Rename event", systemImage: "pencil")
+                    }
+                    Button(role: .destructive) {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Label("Delete activity", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
         }
         .sheet(isPresented: $showShareSheet) {
             ShareActivityView(activity: activity, coordinates: coordinates)
         }
-        .confirmationDialog("Delete this activity?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+        .alert("Rename event", isPresented: $showRename) {
+            TextField("Event name", text: $renameText)
+            Button("Save") { store.rename(activity, to: renameText) }
+            Button("Cancel", role: .cancel) {}
+        }
+        .confirmationDialog("Delete \"\(title)\"?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { store.delete(activity); dismiss() }
             Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This can't be undone.")
         }
     }
 }
 
 private struct RouteMap: View {
     let coordinates: [CLLocationCoordinate2D]
+    let sportType: SportType
 
     private static let drawDuration: TimeInterval = 5.5
 
@@ -116,7 +155,12 @@ private struct RouteMap: View {
     }
 
     var body: some View {
-        TimelineView(.animation(paused: isDrawComplete)) { timeline in
+        // MapPolyline overlay reconciliation is too slow to keep up with a 60fps
+        // TimelineView tick, so the line stayed visually static and only caught up
+        // in one jump once ticking stopped. Throttling to ~12fps gives MapKit time
+        // to actually apply each polyline update, keeping the line in step with
+        // the marker instead of popping in at the end.
+        TimelineView(.animation(minimumInterval: 1.0 / 12.0, paused: isDrawComplete)) { timeline in
             let progress = min(timeline.date.timeIntervalSince(startDate) / Self.drawDuration, 1)
             let revealedCount = max(2, Int(Double(coordinates.count) * progress))
 
@@ -124,17 +168,21 @@ private struct RouteMap: View {
                 MapPolyline(coordinates: Array(coordinates.prefix(revealedCount)))
                     .stroke(.accent, lineWidth: 4)
 
-                // Leading marker at the animation's current tip — stands in for
-                // "the person"; could become a sport-specific icon later.
+                // The "person" marker: a sport-specific icon riding the tip of
+                // the route while it draws, bouncing gently — it comes to rest
+                // at the finish when the draw completes.
                 Annotation("", coordinate: coordinates[revealedCount - 1]) {
-                    Circle()
-                        .fill(.accent)
-                        .frame(width: 14, height: 14)
-                        .overlay(Circle().stroke(.white, lineWidth: 2))
+                    Image(systemName: sportType.symbolName)
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.white)
+                        .padding(7)
+                        .background(.black.opacity(0.6), in: Circle())
+                        .symbolEffect(.bounce, options: .repeating, isActive: !isDrawComplete)
                 }
             }
             .mapStyle(.standard)
             .allowsHitTesting(false)
+            .animation(nil, value: revealedCount)
         }
         .task {
             startDate = Date()
