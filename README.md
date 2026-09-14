@@ -154,3 +154,7 @@ Known non-code warnings that always appear (don't chase them): the
 ## Contributing
 
 See `CONTRIBUTING.md` for setup, conventions, and PR process.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
