@@ -19,6 +19,12 @@ jobs:
             2>&1 | tee build.log | grep -Ei "error:|BUILD SUCCEEDED|BUILD FAILED"
           ! grep -q "BUILD FAILED" build.log
 
+      - name: Prepare Simulator
+        run: |
+          xcrun simctl shutdown all || true
+          xcrun simctl boot "iPhone 17" || true
+          xcrun simctl bootstatus "iPhone 17" -b
+
       - name: Test
         run: |
           xcodebuild -project larping.xcodeproj -scheme larping \

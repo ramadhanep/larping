@@ -417,6 +417,20 @@ pause (the 10'/20'/10' example → active 20'), multiple pause/resume
 accumulation, finish-while-paused, finish-while-recording, near-zero
 duration safety, and `elapsedSeconds` tracking.
 
+## `(pending)` — CI: UI test "operation never finished bootstrapping" crash
+
+GitHub Actions UI test run died with `Early unexpected exit, operation never
+finished bootstrapping` before the test runner connected. Root cause: the Test
+step let `xcodebuild test` boot the simulator lazily and launch the runner
+before CoreSimulator was fully ready (a known flake on `macos-latest` fresh
+VMs). Fix in `.github/workflows/ci.yml`: a `Prepare Simulator` step that
+`simctl shutdown all`, boots the target device, then `simctl bootstatus -b`
+(blocks until boot completes) before running tests. Note that dropping the
+proposed `erase all` step is by design — each GitHub Actions job runs on a
+pristine VM, so there are no stale devices to erase; hardcoded
+`SimDeviceType`/`SimRuntime` ids are the real flake risk (they differ per
+Xcode image) and were left out.
+
 ## Next / not built
 
 Deferred / do-not-build items, so a fresh session doesn't re-propose them:
