@@ -1,18 +1,34 @@
-# Larping (iOS)
+# Larping
 
-SwiftUI iOS app. Brand "Larping", tagline "actually works". Black/white
-monochrome aesthetic (Grok-style space theme) with an adaptive brand accent
-(`#463CFF` light mode, `#CEFE06` lime dark mode).
+<p align="center">
+  <img src="screenshots/logo-horizontal.png" alt="Larping — actually works" width="520">
+</p>
 
-**Fully offline, no server, no account.** All data is stored on-device in
-SwiftData (SQLite) — there is zero networking in this app. Think Strava, but
-just the recording, and private by construction (nothing ever leaves the
-device).
+**The offline, private Strava alternative.** Larping is a free,
+open-source iOS app that records GPS activities — runs, rides, hikes, walks,
+swims — on a live map, with elevation gain and pause-aware timing (a
+20-minute run stays 20 minutes even if you pause in the middle). Finish
+auto-saves, so there's no lost workout.
 
-Read `docs/ARCHITECTURE.md` first (current structure), `docs/STATUS.md`
-(how it got here / commit log), `docs/KNOWN_ISSUES.md` (known gaps). The docs
-are written so a fresh session understands the whole app without re-reading
-source.
+The whole thing lives on your device. **No account. No server. No ads. Zero
+networking.** All data is stored on-device in SwiftData (SQLite) — nothing
+ever leaves your phone. Think Strava, but just the recording, and private by
+construction.
+
+Open source, built with SwiftUI + SwiftData — no third-party
+dependencies. Optional extras that keep the privacy promise: GPX import,
+HealthKit sync/import (you opt in), and JSON backup/restore via iCloud Drive.
+Works fully offline; GPS + Apple Maps tiles aside, the app itself never
+touches the network.
+
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/activities.png" alt="Activities" width="260">
+  <img src="screenshots/activity-detail.png" alt="Activity detail — hero route map" width="260">
+  <img src="screenshots/record.png" alt="Record — live GPS recording" width="260">
+  <img src="screenshots/stats.png" alt="Stats" width="260">
+</p>
 
 ## Features
 
@@ -126,6 +142,12 @@ Known non-code warnings that always appear (don't chase them): the
   a Widget Extension target, see `docs/KNOWN_ISSUES.md`.
 - No Apple Watch app, no scheduled automatic backup, no HealthKit active
   energy/calories — full rationale in `docs/STATUS.md` "Next / not built".
+
+## Documentation
+
+- `docs/ARCHITECTURE.md` — current structure, theming, conventions
+- `docs/STATUS.md` — how it got here / commit-by-commit log
+- `docs/KNOWN_ISSUES.md` — known gaps and non-bugs
 
 ## Contributing
 

@@ -36,7 +36,8 @@ red-background/white-text natively.
 (wordmark, `template-rendering-intent: template` — single alpha-mask PNG,
 recolor per-placement with `.foregroundStyle`/`.tintColor` rather than
 shipping separate black/white files). Both are derived from `logo.png` /
-`logo-horizontal.png` at the repo root, which are raw, oversized design
+`logo-horizontal.png` in the repo's `screenshots/` folder, which are raw,
+oversized design
 sources — never reference them directly from app code; regenerate the
 in-bundle assets from them instead if the source logo changes.
 `LogoHorizontal` is the Activities list's `.principal` toolbar item (replaces
