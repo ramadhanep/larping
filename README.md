@@ -1,7 +1,10 @@
 # Larping
 
 <p align="center">
-  <img src="screenshots/logo-horizontal.png" alt="Larping — actually works" width="520">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="screenshots/logo-horizontal-dark.png">
+    <img src="screenshots/logo-horizontal.png" alt="Larping — actually works" width="300">
+  </picture>
 </p>
 
 **The offline, private Strava alternative.** Larping is a free,
@@ -27,7 +30,6 @@ touches the network.
   <img src="screenshots/activities.png" alt="Activities" width="260">
   <img src="screenshots/activity-detail.png" alt="Activity detail — hero route map" width="260">
   <img src="screenshots/record.png" alt="Record — live GPS recording" width="260">
-  <img src="screenshots/stats.png" alt="Stats" width="260">
 </p>
 
 ## Features
