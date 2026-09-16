@@ -6,15 +6,19 @@ struct ActivitiesListView: View {
     @State private var showGPXImport = false
     @State private var showHealthImport = false
 
+    private static let monthFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter
+    }()
+
     private var lastWeek: [CDActivity] {
         let cutoff = Calendar.current.date(byAdding: .day, value: -6, to: Calendar.current.startOfDay(for: Date()))!
         return activities.filter { $0.startedAt >= cutoff }
     }
 
     private var monthSections: [(month: String, activities: [CDActivity])] {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM yyyy"
-        let groups = Dictionary(grouping: activities) { formatter.string(from: $0.startedAt) }
+        let groups = Dictionary(grouping: activities) { Self.monthFormatter.string(from: $0.startedAt) }
         return groups
             .sorted { ($0.value.first?.startedAt ?? .distantPast) > ($1.value.first?.startedAt ?? .distantPast) }
             .map { (month: $0.key, activities: $0.value) }

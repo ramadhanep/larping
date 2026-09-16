@@ -122,7 +122,10 @@ same sport repeatedly never produces duplicate titles. Old/imported activities
 with `eventName == nil` fall back to the base name at display time.
 `ActivitiesStore.rename(_:to:)` lets a saved activity's event be renamed later
 (detail view's overflow menu) — trims, and an empty result clears back to
-`nil` (auto name) rather than storing an empty string.
+`nil` (auto name) rather than storing an empty string. Rename and delete now
+`throws`: a failed save reverts the rename in memory / rolls the pending
+delete back out of the context instead of reporting success that never
+persisted, and `ActivityDetailView` surfaces both as an error alert.
 
 No visibility, no cover photo — single-user offline app. The Profile cover
 card cannot be customized with a photo (no `PhotosPicker`, no
@@ -159,8 +162,11 @@ which read as translucent gray over the map) — opaque enough to keep the
 form legible, translucent enough that the map still shows through faintly;
 light mode keeps `.thinMaterial`. On **Finish** it calls
 `tracker.stop()`, then `ActivitiesStore.create(...)` **immediately** (auto-
-save — no form, no discard path), storing the event name (auto name when left
-blank), and shows a "saved" alert. Only after the local save succeeds does a
+save — no form, no discard path, throws on SwiftData save failure so a disk
+error surfaces as a user alert instead of silently losing the recording,
+rolling any uncommitted insert back out of the context on failure so no
+phantom activity lingers), storing the event name (auto name when left blank), and shows a "saved"
+alert on success. Only after the local save succeeds does a
 fire-and-forget `Task { await HealthKitService.saveWorkout(from: activity) }`
 optionally mirror the workout into the Health app (see "HealthKit" below) —
 HealthKit failure or denial never blocks or loses the local save.
@@ -206,11 +212,12 @@ card reads as one block down to the tab bar. Applied with `.toolbarBackground`/
 bar and their default nav bars. Light mode untouched (automatic).
 
 **History heatmap**: the Record map draws every past activity's route
-(`activitiesStore.activities`, capped at 500 by `ActivitiesStore.refresh`) as
+(`activitiesStore.activities`, sliced to the 500 most recent at the call
+site — the store itself is uncapped so Stats sees the full dataset) as
 a stacked translucent `MapPolyline` (`Color.accentColor.opacity(0.12)`)
 underneath the live recording polyline. No real spatial-binning pass —
 overlap "heat" is just alpha blending from stacking. Revisit with a proper
-grid-binned intensity pass if the 50-activity cap or blending starts looking
+grid-binned intensity pass if the 500-activity cap or blending starts looking
 wrong at higher activity counts.
 
 **Route draw-in animation**: `ActivityDetailView.RouteMap` reveals the route
@@ -339,11 +346,21 @@ and highest max heart rate, each with their sport icon).
 
 `BackupService.backupFile(from:)` flattens `CDActivity`+points into plain
 Codable snapshots (`BackupContainer { app:"Larping", version:1, ... }`, pretty
-JSON, ISO dates) → system `fileExporter` (Files/iCloud Drive/Mail).
-`BackupService.restore(from:into:)` decodes the same shape and re-materializes
-records, **skipping ids that already exist** (idempotent — never duplicates
-or deletes) and rejecting junk/non-Larping files. `ProfileView` has both
-"Export all activities" and "Import backup", and stamps `@AppStorage
+JSON, ISO dates) → system `fileExporter` (Files/iCloud Drive/Mail). Every
+activity is included (no silent fetch cap), and SwiftData fetch errors
+propagate to the export UI rather than producing an empty "successful"
+backup. `BackupService.restore(from:into:)` decodes the same shape and
+re-materializes records, **skipping ids that already exist** (idempotent —
+never duplicates or deletes; duplicate ids *within* one file import only
+once) and rejecting junk/non-Larping files; its own existing-IDs fetch is
+also error-propagating, so a failed read can never silently fall back to
+"empty store" and duplicate a backup's contents. The whole import commits in
+a single save: if it fails, every uncommitted insert is rolled back, so a
+partial restore never leaves phantom activities (which a later unrelated
+save might otherwise commit) — the store stays exactly as it was and
+re-importing after fixing the cause is clean.
+`ProfileView` has both "Export all activities" and "Import backup", and
+stamps `@AppStorage
 "lastBackupDate"` on each success — shown in the Backup section as
 "Last backup: …".
 
@@ -424,8 +441,11 @@ schema changed (see `KNOWN_ISSUES.md`).
 `larpingTests/` has real unit coverage for the non-trivial logic:
 `GPXParserTests`, `FormattersTests`, `BackupServiceTests` (round-trip via an
 in-memory `ModelContainer`), `ShareImageComposerTests` (canvas-size smoke
-test). `larpingUITests/` is still the unmodified Xcode template scaffold
-(launch test only). Run via Xcode's Test navigator or:
+test), `ActivitiesStoreTests` (create persistence, rename, delete, uncapped
+refresh via a fresh `ModelContext` over the same in-memory container),
+`LocationTrackerTests` (fake clock, pause-resume boundaries), and
+`EventNamerTests`. `larpingUITests/` is still the unmodified Xcode template
+scaffold (launch test only). Run via Xcode's Test navigator or:
 
 ```bash
 xcodebuild -project larping.xcodeproj -scheme larping \

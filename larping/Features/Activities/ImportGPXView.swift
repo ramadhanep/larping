@@ -97,18 +97,22 @@ struct ImportGPXView: View {
         let endedAt = parsed.endedAt ?? startedAt
         let duration = Int(endedAt.timeIntervalSince(startedAt))
 
-        activitiesStore.create(
-            sportType: sportType,
-            startedAt: startedAt,
-            endedAt: endedAt,
-            durationSeconds: duration > 0 ? duration : nil,
-            distanceMeters: Int(parsed.distanceMeters),
-            elevationGainMeters: parsed.elevationGainMeters > 0 ? Int(parsed.elevationGainMeters) : nil,
-            averageSpeedMps: duration > 0 ? parsed.distanceMeters / Double(duration) : nil,
-            maxSpeedMps: nil,
-            source: "gpx_import",
-            trackPointsPayloads: parsed.trackPoints
-        )
-        dismiss()
+        do {
+            try activitiesStore.create(
+                sportType: sportType,
+                startedAt: startedAt,
+                endedAt: endedAt,
+                durationSeconds: duration > 0 ? duration : nil,
+                distanceMeters: Int(parsed.distanceMeters),
+                elevationGainMeters: parsed.elevationGainMeters > 0 ? Int(parsed.elevationGainMeters) : nil,
+                averageSpeedMps: duration > 0 ? parsed.distanceMeters / Double(duration) : nil,
+                maxSpeedMps: nil,
+                source: "gpx_import",
+                trackPointsPayloads: parsed.trackPoints
+            )
+            dismiss()
+        } catch {
+            errorMessage = "Couldn't save: \(error.localizedDescription)"
+        }
     }
 }

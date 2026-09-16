@@ -1,10 +1,8 @@
 import MapKit
-import SwiftData
 import SwiftUI
 
 struct RecordView: View {
     @Environment(ActivitiesStore.self) private var activitiesStore
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @State private var tracker = LocationTracker()
     @State private var selectedSport: SportType = .run
@@ -12,6 +10,7 @@ struct RecordView: View {
     @State private var eventEdited = false
     @State private var cameraPosition: MapCameraPosition = .userLocation(fallback: .automatic)
     @State private var showSavedConfirmation = false
+    @State private var saveErrorMessage: String?
     @State private var savedDistance: Double = 0
 
     var body: some View {
@@ -20,8 +19,10 @@ struct RecordView: View {
                 Map(position: $cameraPosition) {
                     // History heatmap: every past route stacked at low opacity —
                     // overlapping segments blend brighter, giving a "heat" build-up
-                    // without a real spatial-binning pass.
-                    ForEach(activitiesStore.activities) { pastActivity in
+                    // without a real spatial-binning pass. Bounded to the 500 most
+                    // recent (activities sorted newest-first); the full list still
+                    // feeds Stats' all-time totals.
+                    ForEach(activitiesStore.activities.prefix(500)) { pastActivity in
                         let points = activitiesStore.coordinates(for: pastActivity)
                         if points.count > 1 {
                             MapPolyline(coordinates: points)
@@ -83,6 +84,14 @@ struct RecordView: View {
                 Button("Done", role: .cancel) {}
             } message: {
                 Text("\(Formatters.distance(meters: savedDistance)) recorded. \nYou can view or delete it from the Activities tab.")
+            }
+            .alert("Couldn't save activity", isPresented: Binding(
+                get: { saveErrorMessage != nil },
+                set: { if !$0 { saveErrorMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(saveErrorMessage ?? "")
             }
         }
     }
@@ -254,28 +263,31 @@ struct RecordView: View {
         let recording = tracker.stop()
         savedDistance = recording.distanceMeters
         let title = eventName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let activity = activitiesStore.create(
-            sportType: selectedSport,
-            startedAt: recording.startedAt,
-            endedAt: recording.endedAt,
-            durationSeconds: recording.durationSeconds > 0 ? recording.durationSeconds : nil,
-            distanceMeters: Int(recording.distanceMeters),
-            elevationGainMeters: recording.elevationGainMeters > 0 ? Int(recording.elevationGainMeters) : nil,
-            averageSpeedMps: averageSpeedMps(recording),
-            maxSpeedMps: recording.maxSpeedMps > 0 ? recording.maxSpeedMps : nil,
-            source: "mobile",
-            eventName: title.isEmpty ? suggestedEventName(for: selectedSport) : title,
-            trackPointsPayloads: recording.trackPoints
-        )
-        showSavedConfirmation = true
-        eventEdited = false
-        eventName = suggestedEventName(for: selectedSport)
-        Task { await HealthKitService.saveWorkout(from: activity) }
+        do {
+            let activity = try activitiesStore.create(
+                sportType: selectedSport,
+                startedAt: recording.startedAt,
+                endedAt: recording.endedAt,
+                durationSeconds: recording.durationSeconds > 0 ? recording.durationSeconds : nil,
+                distanceMeters: Int(recording.distanceMeters),
+                elevationGainMeters: recording.elevationGainMeters > 0 ? Int(recording.elevationGainMeters) : nil,
+                averageSpeedMps: averageSpeedMps(recording),
+                maxSpeedMps: recording.maxSpeedMps > 0 ? recording.maxSpeedMps : nil,
+                source: "mobile",
+                eventName: title.isEmpty ? suggestedEventName(for: selectedSport) : title,
+                trackPointsPayloads: recording.trackPoints
+            )
+            showSavedConfirmation = true
+            eventEdited = false
+            eventName = suggestedEventName(for: selectedSport)
+            Task { await HealthKitService.saveWorkout(from: activity) }
+        } catch {
+            saveErrorMessage = error.localizedDescription
+        }
     }
 
     private func suggestedEventName(for sport: SportType) -> String {
-        let all = (try? modelContext.fetch(FetchDescriptor<CDActivity>())) ?? []
-        return EventNamer.nextName(base: "Larping \(sport.label)", existing: all.compactMap(\.eventName))
+        EventNamer.nextName(base: "Larping \(sport.label)", existing: activitiesStore.activities.compactMap(\.eventName))
     }
 
     private func averageSpeedMps(_ recording: LocationTracker.Recording) -> Double? {

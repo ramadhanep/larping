@@ -7,8 +7,9 @@ import HealthKit
 /// here is best-effort: Larping's SwiftData store is the source of truth and
 /// recording never depends on HealthKit authorization.
 ///
-/// Read side (importing Watch workouts back into Larping) is deliberately not
-/// here yet — see `Core/GPXParser.swift` for the comparable import shape.
+/// The read side (importing Watch/iPhone workouts back into Larping) lives in
+/// the `HealthKitService` extension below. Both mirror the storage shapes the
+/// recorder produces (see `Core/GPXParser.swift` / `TrackPointPayload`).
 enum HealthKitService {
     static var isAvailable: Bool {
         HKHealthStore.isHealthDataAvailable()

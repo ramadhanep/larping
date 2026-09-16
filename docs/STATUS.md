@@ -431,6 +431,95 @@ pristine VM, so there are no stale devices to erase; hardcoded
 `SimDeviceType`/`SimRuntime` ids are the real flake risk (they differ per
 Xcode image) and were left out.
 
+## Tech-debt pass: backup/save correctness, stats cap, store tests
+
+Four silent-failure / correctness issues fixed in one pass:
+
+- **Backup export capped at 2000 + `try?` swallowed errors.** `BackupService
+  .backupFile` silently fetched at most 2000 activities (the "Export all"
+  button was a lie past 2000) and silently fell back to an empty list on any
+  SwiftData fetch failure — the user would see "backup exported" with zero
+  data in it, the only off-device copy of their activities. Removed the
+  fetch limit entirely and changed to `try` so errors propagate to the
+  Profile export UI instead of masquerading as success.
+- **Backup re-import duplicate-on-failure bug.** `restore` built the
+  idempotency set of existing activity IDs with `(try? ...)?.map(...)` — if
+  the SwiftData fetch failed, the set was treated as empty, causing every
+  activity in the backup to be re-imported as duplicates. Changed to `try`
+  so a failure aborts the import and surfaces the error to the user instead
+  of silently duplicating every record.
+- **Auto-save-on-finish swallowed SwiftData save errors.** `ActivitiesStore
+  .create` called `try? modelContext.save()`. On a save failure (disk full,
+  corrupt store, migration gone wrong) the activity was inserted into the
+  in-memory `activities` array and a "saved" alert shown — but the data
+  never persisted, so it vanished on next launch; meanwhile a HealthKit
+  workout was still written for the phantom activity. `create` now `throws`;
+  only the in-memory insert runs after a confirmed save. All three callers
+  (Record finish, GPX import, HealthKit import) wrap the call in `do/catch`
+  and surface errors to the user instead of silently reporting success.
+- **Stats "All time" silently capped at 500 activities.** `ActivitiesStore
+  .refresh()` capped `activities` at 500 for the Record heatmap, but
+  `StatsView` uses the same array for all-time totals and personal-best
+  computations — silently wrong past 500 activities. Removed the cap from
+  the store; the heatmap now slices `activities.prefix(500)` itself, leaving
+  Stats to see the full dataset.
+- **ActivitiesStoreTests added** covering create-persists, rename, delete,
+  and the all-time-uncapped refresh behavior. Saved the heatmap
+  `DateFormatter` as a static let in `ActivitiesListView` to avoid
+  re-creating it on every body evaluation. Fixed a stale doc comment in
+  `HealthKitService` that claimed the read/import side "is deliberately not
+  here yet" — it's been there since the HealthKit import pass.
+
+## Tech-debt pass 2: persistence error propagation
+
+Second persistence-correctness pass, extending the first (`create` throws) to
+every user-visible persistent op. Principle: **a persistence failure must
+never present as a successful mutation**, and an uncommitted (pending) state
+must never survive a failed save to be committed later by an unrelated one.
+
+- **`ActivitiesStore.rename`/`delete` no longer swallow save failures.** Both
+  used `try? modelContext.save()` — renaming the event in memory / removing
+  it from `activities` even when the save failed, so the UI showed a success
+  that reverted on next launch. Both now `throws`: rename reverts the
+  in-memory name on failure; delete rolls the pending delete back out of the
+  context. `ActivityDetailView` surfaces both ("Couldn't save changes" alert)
+  and no longer dismisses on a failed delete.
+- **`create` now rolls back uncommitted inserts on save failure.** The first
+  pass made `create` throw, but a failed save left the new activity *pending
+  in the context* — absent from `store.activities`, yet visible in the
+  `@Query` list and committed by any later unrelated save. `create` now
+  `modelContext.rollback()`s on failure, leaving zero trace.
+- **`BackupService.restore` is atomic / all-or-nothing.** A save failure
+  previously left every inserted backup activity pending in the context: the
+  error surfaced (pass 1) but the partial import stuck around and could be
+  committed by a later save. Restore now `rollback()`s the whole uncommitted
+  import — the store is left exactly as it was, so re-importing after fixing
+  the cause is clean. Also guards against malformed backups listing the same
+  activity id twice (only the first occurrence imports, the rest count as
+  skipped).
+- **Last user-visible persistence `try?` removed.** `RecordView
+  .suggestedEventName` replaced a raw `modelContext.fetch` (`try?` → empty on
+  failure → could suggest an already-used name) with the already-loaded
+  `activitiesStore.activities`.
+- **Track-point "duplication on reimport" investigated → not a bug.**
+  Idempotency keys on **activity** ids and delete cascades free an activity's
+  point ids, so re-importing a backup after deleting an imported activity
+  revives it (activity + points) exactly once — never as duplicates. The only
+  path that regenerates ids (`create`, for live/GPX/HealthKit import) is off
+  the restore path entirely. See `docs/KNOWN_ISSUES.md`.
+- **Test seams, not a DI framework.** `ActivitiesStore.persistOperation`
+  (nil → real save) and the defaulted `BackupService.restore(persist:)`
+  parameter (default → real save) let tests force a save failure with a plain
+  in-memory container.
+- **Tests added.** ActivitiesStoreTests: create-rollback leaves zero rows in
+  a fresh `ModelContext`; failed rename keeps the stored name in memory +
+  persisted; failed delete keeps the activity alive in memory + store.
+  BackupServiceTests: re-import twice duplicates neither activities nor track
+  points; duplicate ids within one file import once; restore save-failure
+  leaves no partial import; delete-then-reimport restores cleanly. All
+  failure assertions read back through a **fresh** `ModelContext` so they
+  prove store state, not just the object's in-memory copy.
+
 ## Next / not built
 
 Deferred / do-not-build items, so a fresh session doesn't re-propose them:

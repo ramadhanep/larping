@@ -42,6 +42,17 @@ stats) is always local and works offline**; only map imagery needs
 connectivity. Offline the polyline renders over an empty gray basemap — data
 is fine.
 
+## Track points never duplicate on backup re-import — not a bug
+
+Restore idempotency is keyed on the **activity** id: re-importing a backup
+skips whole activities that already exist, so track points can't pile up
+beneath them. If the activity was deleted in the meantime (the cascade removes
+its points), re-importing revives the activity *and* its original points
+exactly once. The only path that "regenerates" ids is `ActivitiesStore.create`
+(live recording, GPX/HealthKit import), which is off the restore path
+entirely and always allocates fresh points — so there is no scenario where a
+re-import produces real duplicate track points.
+
 ## No true background iCloud sync (paid entitlement)
 
 The app is fully offline and stores everything in SwiftData; it does NOT

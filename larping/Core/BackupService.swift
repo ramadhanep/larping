@@ -8,11 +8,12 @@ import UniformTypeIdentifiers
 /// Drive through the Files app. Plain Codable structs (not the `@Model`
 /// classes) so the payload is stable and restorable later.
 enum BackupService {
-    /// Builds the export payload for the given context.
+    /// Builds the export payload for the given context. Every activity is
+    /// included — the UI promises "Export all", and a silent cap would quietly
+    /// drop the oldest data from the user's only off-device copy.
     static func backupFile(from context: ModelContext) throws -> BackupFile {
-        var descriptor = FetchDescriptor<CDActivity>(sortBy: [SortDescriptor(\.startedAt, order: .reverse)])
-        descriptor.fetchLimit = 2000
-        let activities = (try? context.fetch(descriptor)) ?? []
+        let descriptor = FetchDescriptor<CDActivity>(sortBy: [SortDescriptor(\.startedAt, order: .reverse)])
+        let activities = try context.fetch(descriptor)
 
         let backups = activities.map { activity -> BackupActivity in
             BackupActivity(
@@ -57,8 +58,15 @@ enum BackupService {
     /// id already exists are skipped, so re-importing the same file (or
     /// importing an older backup over newer data) never duplicates or destroys
     /// anything. Returns the number of activities imported (skipped not
-    /// counted).
-    static func restore(from data: Data, into context: ModelContext) throws -> (imported: Int, skipped: Int) {
+    /// counted). Any failure (fetch, decode, save) leaves the store untouched:
+    /// the whole uncommitted import is rolled back, so a partially-failed
+    /// restore can't surface phantom activities or later be committed by an
+    /// unrelated save.
+    static func restore(
+        from data: Data,
+        into context: ModelContext,
+        persist: (ModelContext) throws -> Void = { try $0.save() }
+    ) throws -> (imported: Int, skipped: Int) {
         let container: BackupContainer
         do {
             container = try JSONDecoder.backup.decode(BackupContainer.self, from: data)
@@ -66,16 +74,21 @@ enum BackupService {
             throw BackupError.invalidFile
         }
         guard container.app == "Larping" else { throw BackupError.notLarpingFile }
-
-        let existingIDs = Set((try? context.fetch(FetchDescriptor<CDActivity>()))?.map(\.id) ?? [])
+        // The idempotency pass MUST see every existing activity: if this fetch
+        // failed we'd treat the store as empty and duplicate every record on re-import.
+        let existingIDs = Set(try context.fetch(FetchDescriptor<CDActivity>()).map(\.id))
 
         var imported = 0
         var skipped = 0
+        // Guards against malformed backups that list the same activity id twice:
+        // only the first occurrence imports, preserving the no-duplicates rule.
+        var importedIDs: Set<UUID> = []
         for backup in container.activities {
-            guard !existingIDs.contains(backup.id) else {
+            guard !existingIDs.contains(backup.id), !importedIDs.contains(backup.id) else {
                 skipped += 1
                 continue
             }
+            importedIDs.insert(backup.id)
             let activity = CDActivity()
             activity.id = backup.id
             activity.sportTypeRaw = backup.sportTypeRaw
@@ -107,7 +120,12 @@ enum BackupService {
             for point in points { context.insert(point) }
             imported += 1
         }
-        try context.save()
+        do {
+            try persist(context)
+        } catch {
+            context.rollback()
+            throw error
+        }
         return (imported, skipped)
     }
 }

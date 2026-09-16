@@ -9,6 +9,7 @@ struct ActivityDetailView: View {
     @State private var showShareSheet = false
     @State private var showRename = false
     @State private var renameText = ""
+    @State private var actionErrorMessage: String?
     @Environment(\.dismiss) private var dismiss
 
     private var title: String {
@@ -126,14 +127,35 @@ struct ActivityDetailView: View {
         }
         .alert("Rename event", isPresented: $showRename) {
             TextField("Event name", text: $renameText)
-            Button("Save") { store.rename(activity, to: renameText) }
+            Button("Save") {
+                do {
+                    try store.rename(activity, to: renameText)
+                } catch {
+                    actionErrorMessage = error.localizedDescription
+                }
+            }
             Button("Cancel", role: .cancel) {}
         }
         .confirmationDialog("Delete \"\(title)\"?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
-            Button("Delete", role: .destructive) { store.delete(activity); dismiss() }
+            Button("Delete", role: .destructive) {
+                do {
+                    try store.delete(activity)
+                    dismiss()
+                } catch {
+                    actionErrorMessage = error.localizedDescription
+                }
+            }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This can't be undone.")
+        }
+        .alert("Couldn't save changes", isPresented: Binding(
+            get: { actionErrorMessage != nil },
+            set: { if !$0 { actionErrorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(actionErrorMessage ?? "")
         }
     }
 }

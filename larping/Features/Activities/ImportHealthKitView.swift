@@ -200,19 +200,23 @@ struct ImportHealthKitView: View {
 
         let points = trackPoints(route: route, heartRate: heartRate)
 
-        activitiesStore.create(
-            sportType: sportType,
-            startedAt: selected.startDate,
-            endedAt: selected.endDate,
-            durationSeconds: duration > 0 ? duration : nil,
-            distanceMeters: distance > 0 ? Int(distance) : nil,
-            elevationGainMeters: elevationGain(route) > 0 ? Int(elevationGain(route)) : nil,
-            averageSpeedMps: duration > 0 && distance > 0 ? distance / Double(duration) : nil,
-            maxSpeedMps: maxSpeed(route),
-            source: "healthkit_import",
-            trackPointsPayloads: points
-        )
-        dismiss()
+        do {
+            try activitiesStore.create(
+                sportType: sportType,
+                startedAt: selected.startDate,
+                endedAt: selected.endDate,
+                durationSeconds: duration > 0 ? duration : nil,
+                distanceMeters: distance > 0 ? Int(distance) : nil,
+                elevationGainMeters: elevationGain(route) > 0 ? Int(elevationGain(route)) : nil,
+                averageSpeedMps: duration > 0 && distance > 0 ? distance / Double(duration) : nil,
+                maxSpeedMps: maxSpeed(route),
+                source: "healthkit_import",
+                trackPointsPayloads: points
+            )
+            dismiss()
+        } catch {
+            errorMessage = "Couldn't save: \(error.localizedDescription)"
+        }
     }
 
     private func routeDistance(_ route: [CLLocation]) -> Double {
